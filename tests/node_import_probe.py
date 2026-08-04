@@ -21,7 +21,18 @@ sys.path.insert(0, "/opt/comfyui")
 # discarding sys.argv completely. main.py calls enable_args_parsing() before it
 # imports cli_args; anything else driving ComfyUI has to do the same, or --cpu
 # is accepted in silence and ignored.
-sys.argv = ["main.py", "--cpu"]
+STATE = "/var/mnt/diffusion"
+sys.argv = [
+    "main.py",
+    "--cpu",
+    # Point every writable directory at the state mount, exactly as the
+    # entrypoint does. Without this the managers constructed below try to
+    # populate /opt/comfyui/user, which is deliberately read-only.
+    "--user-directory", f"{STATE}/user",
+    "--input-directory", f"{STATE}/input",
+    "--output-directory", f"{STATE}/output",
+    "--temp-directory", f"{STATE}/cache/temp",
+]
 
 import comfy.options  # noqa: E402
 
@@ -30,6 +41,17 @@ comfy.options.enable_args_parsing()
 from comfy.cli_args import args  # noqa: E402
 
 assert args.cpu, "enable_args_parsing() did not take effect; --cpu was discarded"
+
+# Nodes reach for server.PromptServer.instance at import time (rgthree,
+# VideoHelperSuite, KJNodes' LTXV nodes all do). main.py constructs it before
+# loading custom nodes; constructing it here is what makes this probe resemble
+# a real startup rather than testing an arrangement that never occurs.
+import asyncio  # noqa: E402
+
+import server  # noqa: E402
+
+asyncio.set_event_loop(loop := asyncio.new_event_loop())
+server.PromptServer(loop)
 
 lock = json.loads(Path("/opt/comfyui/nodes.lock.json").read_text())
 failures = []

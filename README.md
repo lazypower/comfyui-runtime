@@ -97,9 +97,12 @@ ComfyUI-Manager ships for discovery and missing-node inspection via `cm-cli`
 (`just inspect <workflow.json>`). It is not the dependency authority and cannot
 become one — the read-only venv enforces that, not configuration.
 
-Consequence worth knowing: nodes that persist settings into their own directory
-rather than the user directory will log write errors. That is the immutability
-working, not a defect.
+`custom_nodes/` is writable; `.venv/` is not. That split is the contract.
+Several widely-used nodes write inside their own directory *at import time*, so
+a fully read-only tree stops them loading rather than merely losing their
+settings. Those writes land in the container's upper layer and vanish on
+restart, so the image still describes the system every time it starts. What
+must not move is the dependency graph, and that lives in the venv.
 
 ## Operating
 

@@ -135,12 +135,37 @@ RUN find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
  && rm -rf /build \
  && chown -R root:root /opt/comfyui \
  && chmod -R a-w /opt/comfyui \
+ && chown -R comfy:comfy /opt/comfyui/custom_nodes \
+ && chmod -R u+w /opt/comfyui/custom_nodes \
  && chmod 0755 /usr/local/bin/entrypoint
+
+# custom_nodes is writable; the venv is not. That split is the actual contract.
+#
+# Several widely-used nodes write inside their own directory AT IMPORT TIME --
+# ComfyUI-Manager creates `default/`, ComfyUI-Custom-Scripts writes
+# `pysssss.json` -- so a fully read-only tree does not merely lose their
+# settings, it stops them loading at all.
+#
+# Determinism survives because these writes land in the container's upper layer
+# and vanish on restart: the image still completely describes the system every
+# time it starts. What must not change is the dependency graph, and that lives
+# in the venv, which stays root-owned and unwritable. A node dropped into the
+# dev mount still cannot install a Python dependency, which is what makes
+# promotion into the manifest the only route.
 
 ENV COMFY_BACKEND=${BACKEND} \
     COMFY_ROOT=/opt/comfyui \
     COMFY_STATE=/var/mnt/diffusion \
-    PATH="/opt/comfyui/.venv/bin:${PATH}"
+    PATH="/opt/comfyui/.venv/bin:${PATH}" \
+    HF_HOME=/var/mnt/diffusion/cache/huggingface \
+    TORCH_HOME=/var/mnt/diffusion/cache/torch \
+    XDG_CACHE_HOME=/var/mnt/diffusion/cache/xdg \
+    MPLCONFIGDIR=/var/mnt/diffusion/cache/matplotlib
+# Declared here as well as exported by the entrypoint so the redirection is a
+# property of the IMAGE, true for `docker run --entrypoint ...` too. Anything
+# that downloads a model must not be able to fill the container's upper layer
+# just because it was invoked without the entrypoint. The entrypoint still
+# recomputes them from COMFY_STATE and creates the directories.
 
 # Deliberately NO `VOLUME /var/mnt/diffusion`. A declared volume gets an
 # anonymous volume auto-created when the operator forgets to bind-mount, which

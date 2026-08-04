@@ -20,17 +20,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # No uv here on purpose: lock_check.py and pin.py are pure stdlib and the
-      # tests need only pytest, so the preinstalled python3 covers this job
-      # without a third-party action to track versions of.
-      - name: Install pytest
-        run: python3 -m pip install --quiet --disable-pip-version-check pytest
+      # uv from the upstream installer rather than the marketplace action: this
+      # runs the same `uv run --with pytest` the justfile does, so CI and a
+      # developer execute an identical command. Pinned to the version the
+      # images are built with -- see runtime.uv in the manifest.
+      - name: Install uv
+        run: |
+          version="$(python3 -c "import json;print(json.load(open('manifest/nodes.lock.json'))['runtime']['uv'])")"
+          curl -LsSf "https://astral.sh/uv/${version}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Lockfiles agree with pinned commits
         run: python3 scripts/lock_check.py
 
       - name: Manifest and prune-logic checks
-        run: python3 -m pytest tests/ -q
+        run: uv run --with pytest python -m pytest tests/ -q
 
   image:
     runs-on: ubuntu-latest

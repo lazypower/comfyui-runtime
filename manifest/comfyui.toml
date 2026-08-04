@@ -10,6 +10,7 @@
 
 [runtime]
 python   = "3.12"                             # node ecosystem is safest here; ComfyUI core supports 3.13
+uv       = "0.12.1"                           # builds the venv AND compiles the locks; CI uses the same
 platform = "x86_64-manylinux_2_28"            # both target hosts are amd64
 base     = "docker.io/library/ubuntu:24.04"   # neutral base; backend runtime arrives via wheels
 

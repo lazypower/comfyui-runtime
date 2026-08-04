@@ -182,6 +182,20 @@ def test_prune_runs_in_the_same_layer_as_the_install():
     assert "import torch" in install, "the post-prune import guard must run in-build"
 
 
+def test_uv_version_is_single_sourced():
+    """uv builds the venv and compiles the locks, so CI and the image must use
+    the same one. The Containerfile's UV_IMAGE default is the second copy of
+    that version; this is what stops the two drifting apart silently."""
+    declared = LOCK["runtime"]["uv"]
+    default = next(
+        (i for i in containerfile_instructions() if i.startswith("ARG UV_IMAGE=")), None
+    )
+    assert default is not None, "Containerfile has no UV_IMAGE arg"
+    assert default.strip().endswith(f":{declared}"), (
+        f"Containerfile pins uv {default.split(':')[-1]}, manifest declares {declared}"
+    )
+
+
 def test_containerfile_does_not_declare_a_volume_for_durable_state():
     """Regression guard.
 

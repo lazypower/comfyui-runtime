@@ -2,6 +2,7 @@
   "_generated_by": "scripts/pin.py resolve -- do not hand-edit",
   "runtime": {
     "python": "3.12",
+    "uv": "0.12.1",
     "platform": "x86_64-manylinux_2_28",
     "base": "docker.io/library/ubuntu:24.04"
   },

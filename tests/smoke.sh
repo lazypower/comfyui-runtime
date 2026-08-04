@@ -46,6 +46,17 @@ check $? "runtime pip install into the production venv fails"
 mounted --entrypoint bash "$IMAGE" -c 'test "$(id -u)" -ne 0' 2>/dev/null
 check $? "runs as a non-root service account"
 
+# The other half of the contract: node code IS writable, because several nodes
+# write inside their own directory at import time and a fully read-only tree
+# stops them loading. Those writes land in the container's upper layer and
+# vanish on restart, so the image still describes the system; the dependency
+# graph is what must not move, and that lives in the venv checked above.
+mounted --entrypoint bash "$IMAGE" -c 'test -w /opt/comfyui/custom_nodes' 2>/dev/null
+check $? "custom_nodes is writable (node self-config at import)"
+
+mounted --entrypoint bash "$IMAGE" -c 'test ! -w /opt/comfyui/main.py' 2>/dev/null
+check $? "application code outside custom_nodes stays read-only"
+
 # --- the pinned environment is what we said it was --------------------------
 mounted --entrypoint python "$IMAGE" -c 'import torch; print(torch.__version__)' >/dev/null 2>&1
 check $? "torch imports"
