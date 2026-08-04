@@ -93,26 +93,29 @@ RUN if getent passwd ${COMFY_UID} >/dev/null; then \
 # --- application ------------------------------------------------------------
 WORKDIR /opt/comfyui
 
-# Pinned commits, no resolution, no network beyond the exact SHAs.
-COPY manifest/nodes.lock.json /build/manifest/nodes.lock.json
-COPY scripts/pin.py /build/scripts/pin.py
-RUN python3 /build/scripts/pin.py fetch /opt/comfyui
+COPY manifest/nodes.lock.json          /build/manifest/nodes.lock.json
+COPY scripts/pin.py                    /build/scripts/pin.py
+COPY env/${BACKEND}/requirements.txt   /build/requirements.txt
 
+# EVERYTHING THAT TOUCHES /opt/comfyui HAPPENS IN THIS ONE LAYER.
+#
+# Not stylistic. `chown -R` and `chmod -R` rewrite every file's metadata, so
+# running either in a later layer makes overlayfs copy up the whole tree --
+# shipping a second complete copy of the ~3.3GB venv that every host then pulls
+# and stores for nothing. Deleting files later is equally futile: it stacks
+# whiteouts on top of bytes that remain in the layer below. Sources, install,
+# prune, cleanup and ownership therefore all land together.
+#
 # `uv pip sync` installs exactly the locked set and REMOVES anything not in it,
-# so the venv cannot drift from the manifest.
-#
-# --index-strategy must match the one used to compile: the lockfile carries the
-# index URLs but not the strategy, and the backend indexes shadow a handful of
-# PyPI packages (certifi, filelock, ...) at older versions.
-# --require-hashes turns the recorded hashes into an enforced check.
-#
-# Install, prune, and verify in ONE layer. The prune must share the install's
-# layer: deleting files in a later layer reclaims nothing, it only stacks
-# whiteouts on top of the bytes. The `import torch` at the end is the guard --
-# if a pruned package turns out to be a DT_NEEDED of libtorch_cuda.so, this
-# build fails rather than the GPU host at 2am.
-COPY env/${BACKEND}/requirements.txt /build/requirements.txt
-RUN uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
+# so the venv cannot drift from the manifest. --index-strategy must match the
+# one used to compile: the lockfile carries the index URLs but not the
+# strategy, and the backend indexes shadow a handful of PyPI packages
+# (certifi, filelock, ...) at older versions. --require-hashes turns the
+# recorded hashes into an enforced check. The `import torch` is the guard on
+# pruning -- if a pruned package turns out to be a DT_NEEDED of
+# libtorch_cuda.so, this build fails rather than the GPU host at 2am.
+RUN python3 /build/scripts/pin.py fetch /opt/comfyui \
+ && uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
  && uv pip sync \
       --python /opt/comfyui/.venv/bin/python \
       --index-strategy unsafe-best-match \
@@ -121,22 +124,20 @@ RUN uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
  && python3 /build/scripts/pin.py prune ${BACKEND} /opt/comfyui/.venv \
  && /opt/comfyui/.venv/bin/python -c \
       "import torch; print('torch', torch.__version__, 'imports after prune')" \
- && du -sh /opt/comfyui/.venv
-
-COPY containers/extra_model_paths.yaml /opt/comfyui/extra_model_paths.yaml
-COPY manifest/nodes.lock.json          /opt/comfyui/nodes.lock.json
-COPY containers/entrypoint.sh          /usr/local/bin/entrypoint
-
-# Strip VCS metadata and bytecode, then seal. Modes are set in the same layer
-# that finishes the tree -- a later `chmod -R` would copy up all ~10GB again.
-# root owns the environment; comfy may read and execute, never write.
-RUN find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
+ && find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
  && find /opt/comfyui -name '__pycache__' -type d -prune -exec rm -rf {} + \
  && rm -rf /build \
  && chown -R comfy:comfy /opt/comfyui \
  && chown -R root:root /opt/comfyui/.venv \
  && chmod -R a-w /opt/comfyui/.venv \
- && chmod 0755 /usr/local/bin/entrypoint
+ && du -sh /opt/comfyui/.venv /opt/comfyui
+
+# Small files only, so these layers stay in the kilobytes. They land after the
+# ownership pass and stay root-owned, which is correct -- they are read-only
+# configuration, not state.
+COPY containers/extra_model_paths.yaml /opt/comfyui/extra_model_paths.yaml
+COPY manifest/nodes.lock.json          /opt/comfyui/nodes.lock.json
+COPY --chmod=0755 containers/entrypoint.sh /usr/local/bin/entrypoint
 
 # THE BOUNDARY IS THE VENV, NOT THE TREE.
 #

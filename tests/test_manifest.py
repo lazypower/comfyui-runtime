@@ -196,6 +196,29 @@ def test_uv_version_is_single_sourced():
     )
 
 
+def test_tree_mutations_share_the_install_layer():
+    """Recursive chown/chmod rewrite every file's metadata, so running either
+    in a later layer makes overlayfs copy up the whole tree -- shipping a
+    second complete copy of the ~3.3GB venv that every host pulls and stores
+    for nothing. This regressed once already; the size is invisible in a
+    passing build, which is exactly why it needs a test."""
+    instructions = containerfile_instructions()
+    install = next(
+        (i for i in instructions if i.startswith("RUN") and "uv pip sync" in i), None
+    )
+    assert install is not None, "no `uv pip sync` RUN instruction found"
+
+    for mutation in ("chown -R", "chmod -R", "pin.py fetch"):
+        offenders = [
+            i for i in instructions
+            if i.startswith("RUN") and mutation in i and i is not install
+        ]
+        assert not offenders, (
+            f"`{mutation}` runs in a RUN separate from the install, duplicating "
+            f"the tree into another layer: {offenders}"
+        )
+
+
 def test_containerfile_does_not_declare_a_volume_for_durable_state():
     """Regression guard.
 
