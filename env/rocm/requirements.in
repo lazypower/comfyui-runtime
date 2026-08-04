@@ -68,6 +68,25 @@ matplotlib
 mss
 opencv-python-headless
 
+# --- ComfyUI-Impact-Pack (429d0159ad42)
+segment-anything
+scikit-image
+piexif
+transformers
+opencv-python-headless
+scipy
+numpy
+dill
+matplotlib
+git+https://github.com/facebookresearch/sam2
+
+# --- ComfyUI-Impact-Subpack (50c7b71a6a22)
+matplotlib
+ultralytics>=8.3.162
+numpy
+opencv-python-headless
+dill
+
 # --- ComfyUI-VideoHelperSuite (4ee72c065db2)
 opencv-python
 imageio-ffmpeg

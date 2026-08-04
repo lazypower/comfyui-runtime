@@ -63,6 +63,18 @@
       "commit": "1289b52fbb6d64a339a4047b9ea74cf7758ccf1e"
     },
     {
+      "name": "ComfyUI-Impact-Pack",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Pack",
+      "ref": "Main",
+      "commit": "429d0159ad429e64d2b3916e6e7be9c22d025c3c"
+    },
+    {
+      "name": "ComfyUI-Impact-Subpack",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
+      "ref": "main",
+      "commit": "50c7b71a6a224734cc9b21963c6d1926816a97f1"
+    },
+    {
       "name": "ComfyUI-VideoHelperSuite",
       "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
       "ref": "main",

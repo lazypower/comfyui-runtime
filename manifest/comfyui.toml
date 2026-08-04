@@ -85,6 +85,16 @@ repo = "https://github.com/kijai/ComfyUI-KJNodes"
 ref  = "main"
 
 [[nodes]]
+name = "ComfyUI-Impact-Pack"
+repo = "https://github.com/ltdrdata/ComfyUI-Impact-Pack"
+ref  = "Main"
+
+[[nodes]]
+name = "ComfyUI-Impact-Subpack"
+repo = "https://github.com/ltdrdata/ComfyUI-Impact-Subpack"
+ref  = "main"
+
+[[nodes]]
 name = "ComfyUI-VideoHelperSuite"
 repo = "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
 ref  = "main"
