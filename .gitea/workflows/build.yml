@@ -1,0 +1,97 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Firecracker microVM runners. Constraints that shape everything below:
+#   - podman, not docker; rootless
+#   - `--net=host` is REQUIRED for build and run: the microVM kernel has no
+#     nftables, so netavark cannot set up a nested netns
+#   - no systemd, no TTY, no persistent state or shared cache between jobs
+#   - the VM is the isolation boundary, so --net=host costs nothing
+
+jobs:
+  static:
+    runs-on: linux
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Lockfiles agree with pinned commits
+        run: bash scripts/lock-check.sh
+
+      - name: Manifest checks
+        run: uv run --with pytest python -m pytest tests/test_manifest.py -q
+
+  image:
+    runs-on: image-xl
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cuda, rocm]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Ensure python3
+        run: command -v python3 || microdnf install -y python3
+
+      - name: Read build args from the lock
+        id: args
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          lock = json.load(open("manifest/nodes.lock.json"))
+          backend = "${{ matrix.backend }}"
+          print(f"apt={' '.join(lock['backends'][backend]['apt'])}")
+          print(f"python={lock['runtime']['python']}")
+          PY
+
+      - name: Build
+        run: |
+          podman build --net=host \
+            --file containers/Containerfile \
+            --build-arg BACKEND=${{ matrix.backend }} \
+            --build-arg BACKEND_APT="${{ steps.args.outputs.apt }}" \
+            --build-arg PYTHON_VERSION="${{ steps.args.outputs.python }}" \
+            --tag comfyui:ci-${{ matrix.backend }} \
+            .
+
+      # Everything a GPU-less microVM can prove: dependency closure resolves and
+      # hash-verifies, every pinned node imports, the venv is immutable, the
+      # state mount is enforced, ComfyUI registers its nodes and serves on CPU,
+      # and the torch wheel is the correct accelerator variant.
+      #
+      # What it CANNOT prove: that kernels actually run. `just test-gpu` covers
+      # that and must run on the target host -- see README.
+      - name: Runtime contract (no GPU required)
+        env:
+          ENGINE: podman
+          IMAGE: comfyui:ci-${{ matrix.backend }}
+          BACKEND: ${{ matrix.backend }}
+          RUN_ARGS: --net=host
+        run: bash tests/smoke.sh
+
+      - name: Push
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          REGISTRY: gitea.wabash.place
+        run: |
+          podman login --username "${{ github.actor }}" \
+                       --password "${{ secrets.REGISTRY_TOKEN }}" "$REGISTRY"
+          # Gitea's package registry is <host>/<owner>/<image>. Uses the OWNER,
+          # not the repository: `containers/ComfyUI` would nest a redundant path
+          # segment, and registries reject the uppercase.
+          repo="$REGISTRY/${{ github.repository_owner }}/comfyui"
+          short="$(echo "${{ github.sha }}" | cut -c1-12)"
+          for tag in "main-${{ matrix.backend }}" "$short-${{ matrix.backend }}"; do
+            podman tag comfyui:ci-${{ matrix.backend }} "$repo:$tag"
+            podman push --tls-verify=true "$repo:$tag"
+          done

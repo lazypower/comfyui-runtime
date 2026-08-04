@@ -1,0 +1,77 @@
+# Declared intent for the ComfyUI images.
+#
+# NOTHING in this file is read at build time. `just lock` resolves it into
+# generated, fully-pinned artifacts which are the only build inputs:
+#
+#   manifest/comfyui.toml  --lock-->  manifest/nodes.lock.json   (exact commits)
+#                          --lock-->  env/<backend>/requirements.txt  (exact wheels + hashes)
+#
+# Intent may float (ref = "main"). The lock never does.
+
+[runtime]
+python   = "3.12"                             # node ecosystem is safest here; ComfyUI core supports 3.13
+platform = "x86_64-manylinux_2_28"            # both target hosts are amd64
+base     = "docker.io/library/ubuntu:24.04"   # neutral base; backend runtime arrives via wheels
+
+[comfyui]
+repo = "https://github.com/comfyanonymous/ComfyUI"
+ref  = "v0.27.1"
+
+# ---------------------------------------------------------------------------
+# Backends
+#
+# The backend owns the torch triple. Custom nodes are forbidden from pinning
+# torch/torchvision/torchaudio (the collector strips those lines) -- otherwise a
+# single node's stale pin would silently drag the whole image onto the wrong
+# accelerator build.
+# ---------------------------------------------------------------------------
+
+[backends.cuda]
+index       = "https://download.pytorch.org/whl/cu130"
+apt         = []
+description = "NVIDIA. CUDA userspace ships inside the torch wheels; driver via CDI."
+
+[backends.rocm]
+# rocm7.1 chosen over the more conservative rocm6.4 for torch VERSION PARITY:
+#   rocm6.4 -> torch 2.9.1     rocm7.0 -> 2.10.0     rocm7.1/7.2 -> 2.13.0
+# cu130 also ships 2.13.0, so both images run identical torch and custom nodes
+# behave the same on both hosts. That parity is the point of one definition.
+# If the AMD host's amdgpu kernel driver is too old for ROCm 7, change this one
+# line back to rocm6.4 and re-lock -- everything else is unaffected.
+index       = "https://download.pytorch.org/whl/rocm7.1"
+apt         = ["libnuma1", "libdrm2", "libelf1"]
+description = "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri."
+
+# ---------------------------------------------------------------------------
+# Curated custom nodes -- the pinned production set.
+#
+# To add a node: append here, `just lock`, `just build`, commit the lockfiles.
+# A node that needs Python dependencies MUST live here. The dev mount cannot
+# install anything, by construction.
+# ---------------------------------------------------------------------------
+
+[[nodes]]
+name = "ComfyUI-Manager"
+repo = "https://github.com/ltdrdata/ComfyUI-Manager"
+ref  = "main"
+role = "inspection"   # discovery / missing-node reporting only, via cm-cli
+
+[[nodes]]
+name = "rgthree-comfy"
+repo = "https://github.com/rgthree/rgthree-comfy"
+ref  = "main"
+
+[[nodes]]
+name = "ComfyUI-Custom-Scripts"
+repo = "https://github.com/pythongosssss/ComfyUI-Custom-Scripts"
+ref  = "main"
+
+[[nodes]]
+name = "ComfyUI-KJNodes"
+repo = "https://github.com/kijai/ComfyUI-KJNodes"
+ref  = "main"
+
+[[nodes]]
+name = "ComfyUI-VideoHelperSuite"
+repo = "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
+ref  = "main"

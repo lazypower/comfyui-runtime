@@ -1,0 +1,149 @@
+# ComfyUI -- one definition, two pinned images.
+#
+# The ONLY difference between the cuda and rocm images is the wheel index the
+# lockfile was compiled against, plus a couple of apt packages. Neither image
+# uses a vendor base: torch's cu130 / rocm6.4 wheels bundle their own userspace
+# runtime, and the kernel driver arrives from the host (CDI for NVIDIA,
+# /dev/kfd + /dev/dri for AMD).
+#
+# Build inputs are generated artifacts only -- manifest/nodes.lock.json and
+# env/<backend>/requirements.txt. comfyui.toml is never read here.
+
+# syntax=docker/dockerfile:1.7
+
+ARG BASE_IMAGE=docker.io/library/ubuntu:24.04
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.1
+
+FROM ${UV_IMAGE} AS uv
+
+# --------------------------------------------------------------------------- base
+FROM ${BASE_IMAGE} AS base
+
+ARG PYTHON_VERSION=3.12
+ARG BACKEND_APT=""
+ARG COMFY_UID=1000
+ARG COMFY_GID=1000
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_PYTHON_INSTALL_DIR=/opt/python \
+    UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
+    VIRTUAL_ENV=/opt/comfyui/.venv
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates git libgl1 libglib2.0-0 tini ${BACKEND_APT} \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=uv /uv /usr/local/bin/uv
+
+# The distro ships no python; the interpreter is uv-managed so its version is
+# pinned by the manifest rather than by Ubuntu's release cycle. Put it on PATH
+# so build steps and the healthcheck can reach it without knowing where uv
+# parked it.
+RUN uv python install ${PYTHON_VERSION} \
+ && ln -sf "$(uv python find ${PYTHON_VERSION})" /usr/local/bin/python3 \
+ && python3 --version
+
+# The service account. It owns NOTHING under /opt -- that is what makes the
+# production environment immutable at runtime rather than merely by convention.
+#
+# ubuntu:24.04 ships a default `ubuntu` user squatting on uid/gid 1000, so evict
+# whoever holds the requested ids first. The uid must match the owner of the
+# host's /var/mnt/diffusion tree, which is why it stays a build arg.
+RUN if getent passwd ${COMFY_UID} >/dev/null; then \
+        userdel -f "$(getent passwd ${COMFY_UID} | cut -d: -f1)"; \
+    fi \
+ && if getent group ${COMFY_GID} >/dev/null; then \
+        groupdel "$(getent group ${COMFY_GID} | cut -d: -f1)" 2>/dev/null || true; \
+    fi \
+ && groupadd -g ${COMFY_GID} comfy \
+ && useradd -u ${COMFY_UID} -g ${COMFY_GID} -M -d /var/mnt/diffusion -s /usr/sbin/nologin comfy
+
+# GPU device access. /dev/kfd and /dev/dri/renderD128 are owned by render/video
+# on the host; passing --device is not enough if the service account is in
+# neither group. These GIDs are Fedora's (Bazzite, CoreOS) -- override for a
+# host that numbers them differently. Rootless podman can instead rely on
+# --group-add keep-groups, which preserves the caller's supplementary groups.
+ARG RENDER_GID=105
+ARG VIDEO_GID=39
+RUN groupadd -g ${RENDER_GID} -f render \
+ && groupadd -g ${VIDEO_GID}  -f video \
+ && usermod -aG render,video comfy
+
+# --------------------------------------------------------------------------- builder
+FROM base AS builder
+
+ARG BACKEND=cuda
+ARG PYTHON_VERSION=3.12
+
+WORKDIR /opt/comfyui
+
+# Sources first: pinned commits, no resolution, no network beyond the exact SHAs.
+COPY manifest/nodes.lock.json /build/manifest/nodes.lock.json
+COPY scripts/pin.py /build/scripts/pin.py
+RUN python3 /build/scripts/pin.py fetch /opt/comfyui
+
+# Then the environment. `uv pip sync` installs exactly the locked set -- it also
+# REMOVES anything not in the lock, so the venv cannot drift from the manifest.
+#
+# --index-strategy must match the one used to compile: the lockfile carries the
+# index URLs but not the strategy, and the backend indexes shadow a handful of
+# PyPI packages (certifi, filelock, ...) at older versions.
+# --require-hashes turns the recorded hashes into an enforced check.
+COPY env/${BACKEND}/requirements.txt /build/requirements.txt
+RUN uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
+ && uv pip sync \
+      --python /opt/comfyui/.venv/bin/python \
+      --index-strategy unsafe-best-match \
+      --require-hashes \
+      /build/requirements.txt
+
+# Strip VCS metadata: the lockfile is the record of what is installed, and a
+# .git tree in custom_nodes invites exactly the runtime mutation we are refusing.
+RUN find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
+ && find /opt/comfyui -name '__pycache__' -type d -prune -exec rm -rf {} +
+
+# --------------------------------------------------------------------------- runtime
+FROM base AS runtime
+
+ARG BACKEND=cuda
+ARG COMFY_UID=1000
+ARG COMFY_GID=1000
+
+LABEL org.opencontainers.image.title="comfyui-${BACKEND}" \
+      org.opencontainers.image.description="ComfyUI, ${BACKEND} backend, pinned environment" \
+      org.opencontainers.image.source="https://github.com/lazypower/containers"
+
+COPY --from=builder --chown=root:root /opt/comfyui /opt/comfyui
+COPY --chown=root:root containers/entrypoint.sh /usr/local/bin/entrypoint
+COPY --chown=root:root containers/extra_model_paths.yaml /opt/comfyui/extra_model_paths.yaml
+COPY --chown=root:root manifest/nodes.lock.json /opt/comfyui/nodes.lock.json
+
+# root owns the environment; comfy may read and execute, never write.
+RUN chmod -R a-w /opt/comfyui \
+ && chmod +x /usr/local/bin/entrypoint
+
+ENV COMFY_BACKEND=${BACKEND} \
+    COMFY_ROOT=/opt/comfyui \
+    COMFY_STATE=/var/mnt/diffusion \
+    PATH="/opt/comfyui/.venv/bin:${PATH}"
+
+# Deliberately NO `VOLUME /var/mnt/diffusion`. A declared volume gets an
+# anonymous volume auto-created when the operator forgets to bind-mount, which
+# would satisfy the entrypoint's `mountpoint` check and silently write a model
+# tree into a volume nobody knows the name of. Leaving it undeclared makes the
+# unmounted case a plain directory, which fails the check loudly. That is the
+# point.
+
+WORKDIR /opt/comfyui
+USER comfy
+EXPOSE 8188
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8188/system_stats',timeout=4).status==200 else 1)"
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint"]
+CMD ["--listen", "0.0.0.0", "--port", "8188"]

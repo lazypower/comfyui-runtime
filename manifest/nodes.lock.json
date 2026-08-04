@@ -1,0 +1,62 @@
+{
+  "_generated_by": "scripts/pin.py resolve -- do not hand-edit",
+  "runtime": {
+    "python": "3.12",
+    "platform": "x86_64-manylinux_2_28",
+    "base": "docker.io/library/ubuntu:24.04"
+  },
+  "backends": {
+    "cuda": {
+      "index": "https://download.pytorch.org/whl/cu130",
+      "apt": [],
+      "description": "NVIDIA. CUDA userspace ships inside the torch wheels; driver via CDI."
+    },
+    "rocm": {
+      "index": "https://download.pytorch.org/whl/rocm7.1",
+      "apt": [
+        "libnuma1",
+        "libdrm2",
+        "libelf1"
+      ],
+      "description": "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri."
+    }
+  },
+  "comfyui": {
+    "repo": "https://github.com/comfyanonymous/ComfyUI",
+    "ref": "v0.27.1",
+    "commit": "c2638ce6c00e3426c48d56a775bc46e9a8464094"
+  },
+  "nodes": [
+    {
+      "name": "ComfyUI-Manager",
+      "repo": "https://github.com/ltdrdata/ComfyUI-Manager",
+      "ref": "main",
+      "commit": "9337a45b74db7ec29a0aa69df39fb6f7694cd905",
+      "role": "inspection"
+    },
+    {
+      "name": "rgthree-comfy",
+      "repo": "https://github.com/rgthree/rgthree-comfy",
+      "ref": "main",
+      "commit": "6b76ee6f2c5a007710b5a16f97c94330d6ecc871"
+    },
+    {
+      "name": "ComfyUI-Custom-Scripts",
+      "repo": "https://github.com/pythongosssss/ComfyUI-Custom-Scripts",
+      "ref": "main",
+      "commit": "609f3afaa74b2f88ef9ce8d939626065e3247469"
+    },
+    {
+      "name": "ComfyUI-KJNodes",
+      "repo": "https://github.com/kijai/ComfyUI-KJNodes",
+      "ref": "main",
+      "commit": "1289b52fbb6d64a339a4047b9ea74cf7758ccf1e"
+    },
+    {
+      "name": "ComfyUI-VideoHelperSuite",
+      "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
+      "ref": "main",
+      "commit": "4ee72c065db22c9d96c2427954dc69e7b908444b"
+    }
+  ]
+}

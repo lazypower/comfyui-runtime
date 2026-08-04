@@ -1,0 +1,31 @@
+# Durable state lives on the host mount at the SAME path inside and outside the
+# container. Paths in workflows, logs, and error messages then mean the same
+# thing in both places -- worth more than it sounds at 2am.
+
+comfyui:
+  base_path: /var/mnt/diffusion/models
+  is_default: true
+
+  checkpoints: checkpoints
+  clip: clip
+  clip_vision: clip_vision
+  configs: configs
+  controlnet: controlnet
+  diffusers: diffusers
+  diffusion_models: diffusion_models
+  embeddings: embeddings
+  gligen: gligen
+  hypernetworks: hypernetworks
+  loras: loras
+  photomaker: photomaker
+  style_models: style_models
+  text_encoders: text_encoders
+  unet: diffusion_models
+  upscale_models: upscale_models
+  vae: vae
+  vae_approx: vae_approx
+
+  # Development scratch. Nodes here load, but the venv is read-only -- so a node
+  # needing Python dependencies WILL fail to import here. That failure is the
+  # design: promote it into manifest/comfyui.toml and rebuild.
+  custom_nodes: /var/mnt/diffusion/custom_nodes.dev

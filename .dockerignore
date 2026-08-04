@@ -1,0 +1,6 @@
+*
+!manifest/nodes.lock.json
+!scripts/pin.py
+!containers/entrypoint.sh
+!containers/extra_model_paths.yaml
+!env/
