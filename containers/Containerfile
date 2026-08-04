@@ -133,25 +133,31 @@ COPY containers/entrypoint.sh          /usr/local/bin/entrypoint
 RUN find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
  && find /opt/comfyui -name '__pycache__' -type d -prune -exec rm -rf {} + \
  && rm -rf /build \
- && chown -R root:root /opt/comfyui \
- && chmod -R a-w /opt/comfyui \
- && chown -R comfy:comfy /opt/comfyui/custom_nodes \
- && chmod -R u+w /opt/comfyui/custom_nodes \
+ && chown -R comfy:comfy /opt/comfyui \
+ && chown -R root:root /opt/comfyui/.venv \
+ && chmod -R a-w /opt/comfyui/.venv \
  && chmod 0755 /usr/local/bin/entrypoint
 
-# custom_nodes is writable; the venv is not. That split is the actual contract.
+# THE BOUNDARY IS THE VENV, NOT THE TREE.
 #
-# Several widely-used nodes write inside their own directory AT IMPORT TIME --
-# ComfyUI-Manager creates `default/`, ComfyUI-Custom-Scripts writes
-# `pysssss.json` -- so a fully read-only tree does not merely lose their
-# settings, it stops them loading at all.
+# The dependency graph must never move: /opt/comfyui/.venv is root-owned and
+# unwritable, and the service account is not root. No node, and no Manager
+# action, can pip-install into a running container. That is the whole point --
+# it is what stops an install accreting dependencies until it can no longer be
+# reproduced.
 #
-# Determinism survives because these writes land in the container's upper layer
-# and vanish on restart: the image still completely describes the system every
-# time it starts. What must not change is the dependency graph, and that lives
-# in the venv, which stays root-owned and unwritable. A node dropped into the
-# dev mount still cannot install a Python dependency, which is what makes
-# promotion into the manifest the only route.
+# The rest of the tree is writable by the service account, because ComfyUI's
+# ecosystem writes into it in several places AT IMPORT TIME and a read-only
+# tree does not merely lose settings, it stops nodes loading:
+#   ComfyUI-Manager        creates custom_nodes/ComfyUI-Manager/default/
+#   ComfyUI-Custom-Scripts os.makedirs(web/extensions/pysssss)  (pysssss.py)
+# Sealing directories one at a time as each new node trips over them is a game
+# with no end state; the venv is the line that actually matters.
+#
+# Determinism survives because those writes land in the container's upper layer
+# and vanish on restart, so the image still completely describes the system
+# every time it starts. Drift cannot accumulate across restarts, which is the
+# failure this design exists to prevent.
 
 ENV COMFY_BACKEND=${BACKEND} \
     COMFY_ROOT=/opt/comfyui \

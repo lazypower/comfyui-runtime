@@ -97,12 +97,20 @@ ComfyUI-Manager ships for discovery and missing-node inspection via `cm-cli`
 (`just inspect <workflow.json>`). It is not the dependency authority and cannot
 become one — the read-only venv enforces that, not configuration.
 
-`custom_nodes/` is writable; `.venv/` is not. That split is the contract.
-Several widely-used nodes write inside their own directory *at import time*, so
-a fully read-only tree stops them loading rather than merely losing their
-settings. Those writes land in the container's upper layer and vanish on
-restart, so the image still describes the system every time it starts. What
-must not move is the dependency graph, and that lives in the venv.
+**The boundary is the venv, not the tree.** `.venv/` is root-owned and
+unwritable and the service account is not root, so nothing in a running
+container can pip-install — no node, no Manager action. The dependency graph
+cannot move.
+
+The rest of `/opt/comfyui` *is* writable, because ComfyUI's ecosystem writes
+into it at import time (Manager into its own directory, Custom-Scripts into
+`web/extensions`), and a read-only tree stops those nodes loading rather than
+merely losing their settings. Sealing directories one at a time as each new
+node trips over them has no end state.
+
+Those writes land in the container's upper layer and vanish on restart, so
+drift cannot accumulate across restarts and the image still describes the
+system every time it starts.
 
 ## Operating
 
