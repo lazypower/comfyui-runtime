@@ -269,6 +269,67 @@ def cmd_fetch(dest: str) -> None:
         checkout(node["repo"], node["commit"], root / "custom_nodes" / node["name"])
 
 
+# --------------------------------------------------------------------------- prune
+
+
+def human(n: int) -> str:
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if n < 1024 or unit == "GiB":
+            return f"{n:.1f}{unit}"
+        n /= 1024
+    return f"{n}B"
+
+
+# Directories whose contents are shipped per GPU architecture. These hold data
+# files -- kernel databases and precompiled Tensile objects -- not linked
+# libraries, so dropping the ones this host cannot use is safe.
+ARCH_DIRS = (
+    "torch/share/miopen/db",
+    "torch/lib/rocblas/library",
+    "torch/lib/hipblaslt/library",
+)
+GFX = re.compile(r"gfx[0-9a-f]+", re.I)
+
+
+def cmd_prune(backend: str, venv: str) -> None:
+    """Strip what this deployment provably cannot use. Runs inside the build."""
+    lock = load_lock()
+    config = lock["backends"][backend]
+    root = Path(venv)
+
+    site = next(root.glob("lib/python*/site-packages"), None)
+    if site is None:
+        die(f"no site-packages under {venv}")
+
+    freed = 0
+
+    # 1. whole packages the manifest says are unreachable
+    packages = config.get("prune_packages", [])
+    if packages:
+        print(f"prune: removing {len(packages)} package(s): {', '.join(packages)}", file=sys.stderr)
+        subprocess.run(
+            ["uv", "pip", "uninstall", "--python", f"{venv}/bin/python", *packages],
+            check=True,
+        )
+
+    # 2. per-architecture kernel data for cards this image will never see
+    archs = {a.lower() for a in config.get("gpu_archs", [])}
+    if archs:
+        print(f"prune: keeping GPU archs {sorted(archs)}", file=sys.stderr)
+        for rel in ARCH_DIRS:
+            directory = site / rel
+            if not directory.is_dir():
+                continue
+            for path in directory.rglob("*"):
+                if not path.is_file():
+                    continue
+                found = {m.group(0).lower() for m in GFX.finditer(path.name)}
+                if found and not (found & archs):
+                    freed += path.stat().st_size
+                    path.unlink()
+        print(f"prune: freed {human(freed)} of foreign-architecture kernels", file=sys.stderr)
+
+
 # --------------------------------------------------------------------------- main
 
 if __name__ == "__main__":
@@ -279,5 +340,7 @@ if __name__ == "__main__":
             cmd_collect(backend)
         case ["fetch", dest]:
             cmd_fetch(dest)
+        case ["prune", backend, venv]:
+            cmd_prune(backend, venv)
         case _:
-            die("usage: pin.py resolve | collect <backend> | fetch <dest>")
+            die("usage: pin.py resolve | collect <backend> | fetch <dest> | prune <backend> <venv>")

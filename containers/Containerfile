@@ -100,13 +100,23 @@ RUN python3 /build/scripts/pin.py fetch /opt/comfyui
 # index URLs but not the strategy, and the backend indexes shadow a handful of
 # PyPI packages (certifi, filelock, ...) at older versions.
 # --require-hashes turns the recorded hashes into an enforced check.
+#
+# Install, prune, and verify in ONE layer. The prune must share the install's
+# layer: deleting files in a later layer reclaims nothing, it only stacks
+# whiteouts on top of the bytes. The `import torch` at the end is the guard --
+# if a pruned package turns out to be a DT_NEEDED of libtorch_cuda.so, this
+# build fails rather than the GPU host at 2am.
 COPY env/${BACKEND}/requirements.txt /build/requirements.txt
 RUN uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
  && uv pip sync \
       --python /opt/comfyui/.venv/bin/python \
       --index-strategy unsafe-best-match \
       --require-hashes \
-      /build/requirements.txt
+      /build/requirements.txt \
+ && python3 /build/scripts/pin.py prune ${BACKEND} /opt/comfyui/.venv \
+ && /opt/comfyui/.venv/bin/python -c \
+      "import torch; print('torch', torch.__version__, 'imports after prune')" \
+ && du -sh /opt/comfyui/.venv
 
 COPY containers/extra_model_paths.yaml /opt/comfyui/extra_model_paths.yaml
 COPY manifest/nodes.lock.json          /opt/comfyui/nodes.lock.json

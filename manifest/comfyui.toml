@@ -30,6 +30,11 @@ ref  = "v0.27.1"
 index       = "https://download.pytorch.org/whl/cu130"
 apt         = []
 description = "NVIDIA. CUDA userspace ships inside the torch wheels; driver via CDI."
+# Removed after install. None are reachable from single-GPU image inference:
+# nccl is multi-GPU collectives, nvshmem is multi-node, cufile is GPUDirect
+# Storage. The build re-imports torch afterwards, so if any of these turns out
+# to be a DT_NEEDED of libtorch_cuda.so the build fails rather than the host.
+prune_packages = ["nvidia-nccl-cu13", "nvidia-nvshmem-cu13", "nvidia-cufile"]
 
 [backends.rocm]
 # rocm7.1 chosen over the more conservative rocm6.4 for torch VERSION PARITY:
@@ -41,6 +46,13 @@ description = "NVIDIA. CUDA userspace ships inside the torch wheels; driver via 
 index       = "https://download.pytorch.org/whl/rocm7.1"
 apt         = ["libnuma1", "libdrm2", "libelf1"]
 description = "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri."
+# The ROCm wheel ships precompiled MIOpen databases and rocBLAS/hipBLASLt
+# Tensile kernels for every supported architecture -- roughly twenty of them,
+# and gigabytes. Keep only what this host actually is. These are data files,
+# not linked libraries, so pruning them cannot break the import; it only means
+# the image will not run on an architecture that is not listed.
+# Add an arch here (and re-lock) before moving the image to a different card.
+gpu_archs = ["gfx1100"]
 
 # ---------------------------------------------------------------------------
 # Curated custom nodes -- the pinned production set.

@@ -9,7 +9,12 @@
     "cuda": {
       "index": "https://download.pytorch.org/whl/cu130",
       "apt": [],
-      "description": "NVIDIA. CUDA userspace ships inside the torch wheels; driver via CDI."
+      "description": "NVIDIA. CUDA userspace ships inside the torch wheels; driver via CDI.",
+      "prune_packages": [
+        "nvidia-nccl-cu13",
+        "nvidia-nvshmem-cu13",
+        "nvidia-cufile"
+      ]
     },
     "rocm": {
       "index": "https://download.pytorch.org/whl/rocm7.1",
@@ -18,7 +23,10 @@
         "libdrm2",
         "libelf1"
       ],
-      "description": "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri."
+      "description": "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri.",
+      "gpu_archs": [
+        "gfx1100"
+      ]
     }
   },
   "comfyui": {

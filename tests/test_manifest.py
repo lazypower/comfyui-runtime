@@ -24,6 +24,25 @@ LOCK = json.loads((ROOT / "manifest" / "nodes.lock.json").read_text())
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 
 
+def containerfile_instructions() -> list[str]:
+    """The Containerfile with comments stripped and continuations joined.
+
+    Assertions must run against instructions, not prose: this file explains
+    itself at length, and a comment quoting `uv pip sync` or `comfyui.toml` is
+    not the same as an instruction doing it.
+    """
+    body = (ROOT / "containers" / "Containerfile").read_text()
+    lines = [ln for ln in body.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+
+    instructions: list[str] = []
+    for line in lines:
+        if instructions and instructions[-1].rstrip().endswith("\\"):
+            instructions[-1] = instructions[-1].rstrip().removesuffix("\\") + " " + line.strip()
+        else:
+            instructions.append(line)
+    return instructions
+
+
 # --------------------------------------------------------------- pinning
 
 def test_comfyui_core_is_pinned_to_an_exact_commit():
@@ -134,6 +153,35 @@ def test_backends_differ_only_in_accelerator_runtime():
 
 # --------------------------------------------------------------- build contract
 
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_pruned_packages_are_actually_installed(backend):
+    """A typo here would prune nothing and be invisible -- the image would just
+    stay large. Every named package must exist in the backend's lock."""
+    declared = LOCK["backends"][backend].get("prune_packages", [])
+    if not declared:
+        pytest.skip(f"{backend} prunes no packages")
+    installed = {
+        line.split("==")[0].lower().replace("_", "-")
+        for line in (ROOT / "env" / backend / "requirements.txt").read_text().splitlines()
+        if re.match(r"^[a-z0-9._-]+==", line)
+    }
+    missing = [p for p in declared if p.lower().replace("_", "-") not in installed]
+    assert not missing, f"{backend}: prune_packages names nothing installed: {missing}"
+
+
+def test_prune_runs_in_the_same_layer_as_the_install():
+    """Deleting files in a later layer reclaims nothing -- it stacks whiteouts
+    on top of the bytes. The prune only saves space if it shares the install's
+    RUN instruction."""
+    install = next(
+        (i for i in containerfile_instructions() if i.startswith("RUN") and "uv pip sync" in i),
+        None,
+    )
+    assert install is not None, "no `uv pip sync` RUN instruction found"
+    assert "pin.py prune" in install, "prune must share the install's RUN layer"
+    assert "import torch" in install, "the post-prune import guard must run in-build"
+
+
 def test_containerfile_does_not_declare_a_volume_for_durable_state():
     """Regression guard.
 
@@ -152,12 +200,7 @@ def test_containerfile_does_not_declare_a_volume_for_durable_state():
 def test_build_reads_only_generated_artifacts():
     """comfyui.toml is intent, not a build input. If the Containerfile starts
     reading it, the image stops being reproducible from the lock alone."""
-    instructions = [
-        line
-        for line in (ROOT / "containers" / "Containerfile").read_text().splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
-    offenders = [line for line in instructions if "comfyui.toml" in line]
+    offenders = [i for i in containerfile_instructions() if "comfyui.toml" in i]
     assert not offenders, f"Containerfile reads declared intent, not the lock: {offenders}"
 
 
