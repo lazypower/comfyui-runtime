@@ -12,6 +12,27 @@ STATE="$(mktemp -d)"
 trap 'rm -rf "$STATE"' EXIT
 mkdir -p "$STATE"/{models,input,output,user,cache/temp,custom_nodes.dev}
 
+# A real, dependency-free node in the dev mount. Asserting it reaches
+# /object_info proves the promotion workflow's first half end to end -- drop a
+# node in, try it live, no rebuild -- which grepping the log for a path name
+# never did.
+mkdir -p "$STATE/custom_nodes.dev/smoke_probe_node"
+cat > "$STATE/custom_nodes.dev/smoke_probe_node/__init__.py" <<'NODE'
+class SmokeProbeNode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {}}
+    RETURN_TYPES = ()
+    FUNCTION = "run"
+    CATEGORY = "smoke"
+
+    def run(self):
+        return ()
+
+NODE_CLASS_MAPPINGS = {"SmokeProbeNode": SmokeProbeNode}
+NODE_DISPLAY_NAME_MAPPINGS = {"SmokeProbeNode": "Smoke Probe"}
+NODE
+
 # mktemp -d gives 0700 owned by whoever runs this, and the container is uid 1000
 # regardless. On a CI runner those differ, so the service account cannot even
 # traverse into the mount and every state-dependent check fails looking like a
@@ -121,9 +142,11 @@ o=json.load(urllib.request.urlopen("http://127.0.0.1:8188/object_info",timeout=2
 import sys; sys.exit(0 if len(o)>100 else 1)' >/dev/null 2>&1
     check $? "node registry populated"
 
-    "$ENGINE" logs "$cid" 2>&1 | grep -qi "custom_nodes.dev" \
-        && ok "dev custom-node directory is on the search path" \
-        || bad "dev custom-node directory not registered"
+    "$ENGINE" exec "$cid" python -c '
+import json, sys, urllib.request
+info = json.load(urllib.request.urlopen("http://127.0.0.1:8188/object_info", timeout=20))
+sys.exit(0 if "SmokeProbeNode" in info else 1)' >/dev/null 2>&1
+    check $? "a node in the dev mount loads without a rebuild"
 
     "$ENGINE" rm -f "$cid" >/dev/null 2>&1
 else
