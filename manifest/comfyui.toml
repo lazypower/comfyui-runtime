@@ -18,6 +18,14 @@ base     = "docker.io/library/ubuntu:24.04"   # neutral base; backend runtime ar
 repo = "https://github.com/comfyanonymous/ComfyUI"
 ref  = "v0.27.1"
 
+# Git requirements cannot carry artifact hashes, so every upstream VCS Python
+# dependency must be declared here. The lock resolves its commit and the
+# collector uses GitHub's immutable commit archive, which uv can SHA-256 pin.
+[[python_sources]]
+name = "sam-2"
+repo = "https://github.com/facebookresearch/sam2"
+ref  = "main"
+
 # ---------------------------------------------------------------------------
 # Backends
 #

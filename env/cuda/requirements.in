@@ -78,7 +78,7 @@ scipy
 numpy
 dill
 matplotlib
-git+https://github.com/facebookresearch/sam2
+https://github.com/facebookresearch/sam2/archive/2b90b9f5ceec907a1c18123530e92e794ad901a4.tar.gz
 
 # --- ComfyUI-Impact-Subpack (50c7b71a6a22)
 matplotlib

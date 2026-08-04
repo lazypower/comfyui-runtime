@@ -54,6 +54,17 @@ def test_every_node_is_pinned_to_an_exact_commit(node):
     assert SHA40.match(node["commit"]), f"{node['name']} is not pinned to a commit"
 
 
+@pytest.mark.parametrize("source", LOCK.get("python_sources", []), ids=lambda s: s["name"])
+def test_every_python_source_is_pinned_to_an_exact_commit(source):
+    assert SHA40.match(source["commit"]), f"{source['name']} is not pinned to a commit"
+
+
+def test_lock_covers_exactly_the_declared_python_sources():
+    declared = {source["name"] for source in MANIFEST.get("python_sources", [])}
+    locked = {source["name"] for source in LOCK.get("python_sources", [])}
+    assert declared == locked
+
+
 def test_lock_covers_exactly_the_declared_nodes():
     declared = {n["name"] for n in MANIFEST["nodes"]}
     locked = {n["name"] for n in LOCK["nodes"]}
@@ -83,6 +94,7 @@ def test_compiled_requirements_are_hash_verified(backend):
     assert "--hash=sha256:" in body, (
         f"{backend} lock has no hashes; determinism is not enforced"
     )
+    assert "git+" not in body, f"{backend} lock contains an unhashable VCS requirement"
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

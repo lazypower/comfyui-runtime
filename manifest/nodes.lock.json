@@ -36,6 +36,14 @@
     "ref": "v0.27.1",
     "commit": "c2638ce6c00e3426c48d56a775bc46e9a8464094"
   },
+  "python_sources": [
+    {
+      "name": "sam-2",
+      "repo": "https://github.com/facebookresearch/sam2",
+      "ref": "main",
+      "commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4"
+    }
+  ],
   "nodes": [
     {
       "name": "ComfyUI-Manager",

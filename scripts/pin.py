@@ -95,8 +95,20 @@ def cmd_resolve() -> None:
             "ref": core["ref"],
             "commit": ls_remote(core["repo"], core["ref"]),
         },
+        "python_sources": [],
         "nodes": [],
     }
+
+    for source in m.get("python_sources", []):
+        print(f"resolving Python source {source['name']} {source['ref']} ...", file=sys.stderr)
+        lock["python_sources"].append(
+            {
+                "name": source["name"],
+                "repo": source["repo"],
+                "ref": source["ref"],
+                "commit": ls_remote(source["repo"], source["ref"]),
+            }
+        )
 
     for node in m.get("nodes", []):
         print(f"resolving {node['name']} {node['ref']} ...", file=sys.stderr)
@@ -129,7 +141,36 @@ def fetch_requirements(repo: str, commit: str) -> str | None:
         raise
 
 
-def clean(body: str, source: str) -> list[str]:
+def github_vcs_archive(line: str, python_sources: dict[str, dict]) -> str:
+    """Replace an upstream GitHub VCS requirement with its locked archive.
+
+    VCS requirements have no artifact hash, so uv correctly rejects them under
+    `--require-hashes`. GitHub commit archives are immutable artifacts and uv
+    records their SHA-256 during compilation. Refuse undeclared VCS sources:
+    adding one is an infrastructure decision, not something a node may float.
+    """
+    name = ""
+    vcs = line
+    if " @ git+" in line:
+        name, vcs = (part.strip() for part in line.split(" @ ", 1))
+
+    if not vcs.startswith("git+https://github.com/"):
+        die(f"{line!r}: VCS dependency is not a supported GitHub HTTPS source")
+    if "#" in vcs:
+        die(f"{line!r}: VCS URL fragments are not supported")
+
+    repo_and_ref = vcs.removeprefix("git+").split("github.com/", 1)[1]
+    repo_path = repo_and_ref.rsplit("@", 1)[0].removesuffix(".git")
+    repo = f"https://github.com/{repo_path}"
+    locked = python_sources.get(repo)
+    if locked is None:
+        die(f"{repo}: undeclared VCS dependency; add it to [[python_sources]]")
+
+    archive = f"{repo}/archive/{locked['commit']}.tar.gz"
+    return f"{name} @ {archive}" if name else archive
+
+
+def clean(body: str, source: str, python_sources: dict[str, dict]) -> list[str]:
     """Strip index directives, includes, and backend-owned packages."""
     kept: list[str] = []
     for raw in body.splitlines():
@@ -138,6 +179,8 @@ def clean(body: str, source: str) -> list[str]:
             continue
         if line.startswith("-"):  # --extra-index-url, -r, -e, --find-links
             continue
+        if "git+" in line:
+            line = github_vcs_archive(line, python_sources)
         name = (
             line.split("[")[0]
             .split("==")[0]
@@ -193,12 +236,18 @@ def cmd_collect(backend: str) -> None:
         die(f"unknown backend {backend!r}; have {', '.join(lock['backends'])}")
 
     sections: list[tuple[str, list[str]]] = []
+    python_sources = {
+        source["repo"].rstrip("/").removesuffix(".git"): source
+        for source in lock.get("python_sources", [])
+    }
 
     core = lock["comfyui"]
     body = fetch_requirements(core["repo"], core["commit"])
     if body is None:
         die("ComfyUI core has no requirements.txt -- upstream layout changed")
-    sections.append((f"ComfyUI {core['ref']} ({core['commit'][:12]})", clean(body, "comfyui")))
+    sections.append(
+        (f"ComfyUI {core['ref']} ({core['commit'][:12]})", clean(body, "comfyui", python_sources))
+    )
 
     for node in lock["nodes"]:
         body = fetch_requirements(node["repo"], node["commit"])
@@ -206,7 +255,7 @@ def cmd_collect(backend: str) -> None:
         if body is None:
             sections.append((f"{label} -- no requirements.txt", []))
             continue
-        sections.append((label, clean(body, node["name"])))
+        sections.append((label, clean(body, node["name"], python_sources)))
 
     out = ROOT / "env" / backend / "requirements.in"
     out.parent.mkdir(parents=True, exist_ok=True)
