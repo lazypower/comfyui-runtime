@@ -39,9 +39,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PYTHON_INSTALL_DIR=/opt/python \
-    UV_LINK_MODE=copy \
     UV_NO_CACHE=1 \
     VIRTUAL_ENV=/opt/comfyui/.venv
+# Deliberately NOT UV_LINK_MODE=copy. uv unpacks each wheel under TMPDIR and
+# then materialises it into the venv; on one filesystem the default hardlink
+# path is nearly free, while `copy` duplicates every byte. The ROCm torch wheel
+# alone unpacks to roughly 13GB, so copy mode doubled peak usage and exhausted
+# the build volume DURING EXTRACTION -- before any post-install pruning could
+# possibly run.
 
 LABEL org.opencontainers.image.title="comfyui-${BACKEND}" \
       org.opencontainers.image.description="ComfyUI, ${BACKEND} backend, pinned environment" \

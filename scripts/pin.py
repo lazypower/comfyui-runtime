@@ -14,6 +14,7 @@ stdlib-only and reads nothing but JSON in that path.
 from __future__ import annotations
 
 import json
+import mmap
 import re
 import subprocess
 import sys
@@ -290,6 +291,90 @@ ARCH_DIRS = (
 )
 GFX = re.compile(r"gfx[0-9a-f]+", re.I)
 
+SONAME = re.compile(r"^(lib[\w.+-]+?\.so[\w.]*)$")
+
+
+def soname_references(site: Path) -> dict[str, set[Path]]:
+    """Map soname -> the library files that mention it.
+
+    Reads DT_NEEDED the cheap way: those entries live as NUL-terminated strings
+    in .dynstr, so scanning the binary finds them without pulling binutils into
+    the image to run readelf once. mmap keeps multi-gigabyte CUDA libraries off
+    the heap.
+
+    Which FILE mentions a soname matters, not merely that one does: a library
+    records its own DT_SONAME, so a naive "is it mentioned anywhere" test would
+    match every candidate against itself and prune nothing, silently.
+
+    Over-reporting is possible (a soname mentioned for some other reason still
+    counts) and is the safe direction -- it costs a missed pruning opportunity,
+    never a broken import.
+    """
+    references: dict[str, set[Path]] = {}
+    roots = [site / "torch" / "lib", site / "torch", *sorted(site.glob("nvidia/*/lib"))]
+
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for lib in root.glob("*.so*"):
+            if not lib.is_file() or lib.is_symlink():
+                continue
+            try:
+                with lib.open("rb") as handle, mmap.mmap(
+                    handle.fileno(), 0, access=mmap.ACCESS_READ
+                ) as blob:
+                    for match in re.finditer(rb"lib[\w.+-]+?\.so[\w.]*", blob):
+                        name = match.group(0).decode("ascii", "replace")
+                        references.setdefault(name, set()).add(lib.resolve())
+            except (OSError, ValueError):
+                continue
+    return references
+
+
+def package_files(site: Path, package: str) -> set[Path]:
+    """Every path a package installed, resolved, from its RECORD."""
+    normalised = package.lower().replace("-", "_")
+    owned: set[Path] = set()
+    for dist in site.glob("*.dist-info"):
+        if dist.name.lower().split("-")[0] != normalised:
+            continue
+        record = dist / "RECORD"
+        if record.exists():
+            for line in record.read_text().splitlines():
+                entry = line.split(",")[0]
+                if entry:
+                    owned.add((site / entry).resolve())
+    return owned
+
+
+def classify_candidates(
+    site: Path, candidates: list[str]
+) -> tuple[list[tuple[str, str, list[str]]], list[str]]:
+    """Split prune candidates into (keep-with-reason, safe-to-drop).
+
+    A candidate is kept when some OTHER library references one of its sonames.
+    "Other" is the crux: every library records its own DT_SONAME, so testing
+    only whether a soname appears anywhere would match each candidate against
+    itself and prune nothing at all -- silently, which is the worst kind.
+    """
+    references = soname_references(site)
+    keep: list[tuple[str, str, list[str]]] = []
+    drop: list[str] = []
+
+    for package in candidates:
+        owned = package_files(site, package)
+        sonames = sorted(p.name for p in owned if SONAME.match(p.name))
+
+        for soname in sonames:
+            others = references.get(soname, set()) - owned
+            if others:
+                keep.append((package, soname, sorted(p.name for p in others)))
+                break
+        else:
+            drop.append(package)
+
+    return keep, drop
+
 
 def cmd_prune(backend: str, venv: str) -> None:
     """Strip what this deployment provably cannot use. Runs inside the build."""
@@ -303,14 +388,26 @@ def cmd_prune(backend: str, venv: str) -> None:
 
     freed = 0
 
-    # 1. whole packages the manifest says are unreachable
-    packages = config.get("prune_packages", [])
-    if packages:
-        print(f"prune: removing {len(packages)} package(s): {', '.join(packages)}", file=sys.stderr)
-        subprocess.run(
-            ["uv", "pip", "uninstall", "--python", f"{venv}/bin/python", *packages],
-            check=True,
-        )
+    # 1. candidate packages the manifest believes are unreachable
+    #
+    # "Believes" is doing real work: libcufile.so.0 turns out to be a DT_NEEDED
+    # of torch._C, so removing nvidia-cufile breaks `import torch` outright.
+    # Rather than discover that one CI cycle at a time, check first -- if any
+    # already-installed library names this package's sonames, keep it and say
+    # so. Deliberately conservative: a soname appearing in a binary for some
+    # other reason costs us a missed pruning opportunity, never a broken image.
+    candidates = config.get("prune_packages", [])
+    if candidates:
+        keep, drop = classify_candidates(site, candidates)
+        for package, soname, by in keep:
+            print(f"prune: KEEPING {package} -- {soname} is linked by {', '.join(by[:3])}",
+                  file=sys.stderr)
+        if drop:
+            print(f"prune: removing {len(drop)} package(s): {', '.join(drop)}", file=sys.stderr)
+            subprocess.run(
+                ["uv", "pip", "uninstall", "--python", f"{venv}/bin/python", *drop],
+                check=True,
+            )
 
     # 2. per-architecture kernel data for cards this image will never see
     archs = {a.lower() for a in config.get("gpu_archs", [])}
