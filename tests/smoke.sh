@@ -10,7 +10,14 @@ BACKEND="${BACKEND:-cuda}"
 
 STATE="$(mktemp -d)"
 trap 'rm -rf "$STATE"' EXIT
-mkdir -p "$STATE"/{models,input,output,user,cache,custom_nodes.dev}
+mkdir -p "$STATE"/{models,input,output,user,cache/temp,custom_nodes.dev}
+
+# mktemp -d gives 0700 owned by whoever runs this, and the container is uid 1000
+# regardless. On a CI runner those differ, so the service account cannot even
+# traverse into the mount and every state-dependent check fails looking like a
+# missing directory. A throwaway fixture can be world-writable; a real
+# deployment matches uid instead (COMFY_UID -- see README).
+chmod -R 0777 "$STATE"
 
 pass=0 fail=0
 ok()   { printf '  \033[32mok\033[0m   %s\n' "$1"; pass=$((pass+1)); }
