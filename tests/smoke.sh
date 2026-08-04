@@ -61,8 +61,14 @@ check $? "runs as a non-root service account"
 mounted --entrypoint bash "$IMAGE" -c 'test -w /opt/comfyui/custom_nodes' 2>/dev/null
 check $? "custom_nodes is writable (node self-config at import)"
 
-mounted --entrypoint bash "$IMAGE" -c 'test -w /opt/comfyui/web' 2>/dev/null
-check $? "web/ is writable (nodes install front-end extensions there)"
+# Exactly what ComfyUI-Custom-Scripts does at import (pysssss.py:
+# os.makedirs(get_comfy_dir("web/extensions/pysssss"))). Asserting the
+# capability rather than a path's existence: ComfyUI 0.27 ships no web/
+# directory at all -- the front end arrives via comfyui-frontend-package -- so
+# `test -w /opt/comfyui/web` would fail on a tree that works perfectly.
+mounted --entrypoint bash "$IMAGE" -c \
+    'mkdir -p /opt/comfyui/web/extensions/_probe' 2>/dev/null
+check $? "nodes can create front-end extension dirs in the app tree"
 
 # --- the pinned environment is what we said it was --------------------------
 mounted --entrypoint python "$IMAGE" -c 'import torch; print(torch.__version__)' >/dev/null 2>&1
