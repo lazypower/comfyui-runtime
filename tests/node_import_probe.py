@@ -42,6 +42,19 @@ from comfy.cli_args import args  # noqa: E402
 
 assert args.cpu, "enable_args_parsing() did not take effect; --cpu was discarded"
 
+# Parsing the directory arguments does not move anything on its own -- main.py
+# pushes each one into folder_paths by hand (main.py:135-156, :489-492). Skip
+# this and UserManager below happily tries to create /opt/comfyui/user, which
+# is read-only by design.
+import os  # noqa: E402
+
+import folder_paths  # noqa: E402
+
+folder_paths.set_output_directory(os.path.abspath(args.output_directory))
+folder_paths.set_input_directory(os.path.abspath(args.input_directory))
+folder_paths.set_user_directory(os.path.abspath(args.user_directory))
+folder_paths.set_temp_directory(os.path.join(os.path.abspath(args.temp_directory), "temp"))
+
 # Nodes reach for server.PromptServer.instance at import time (rgthree,
 # VideoHelperSuite, KJNodes' LTXV nodes all do). main.py constructs it before
 # loading custom nodes; constructing it here is what makes this probe resemble
