@@ -12,12 +12,24 @@ from pathlib import Path
 
 sys.path.insert(0, "/opt/comfyui")
 
-# ComfyUI parses sys.argv at import of comfy.cli_args, and importing almost any
-# custom node reaches comfy.model_management, which selects a device eagerly and
-# raises "Found no NVIDIA driver on your system" on a GPU-less machine. Ask for
-# CPU before anything comfy-related loads, or this probe only ever passes on a
-# host that has the very hardware it is meant to not need.
+# Importing almost any custom node reaches comfy.model_management, which selects
+# a device eagerly and raises on a GPU-less machine ("Found no NVIDIA driver" /
+# "No CUDA GPUs are available"). So ask for CPU before anything comfy loads.
+#
+# Setting sys.argv is NOT enough on its own. comfy/options.py defaults
+# args_parsing=False, and comfy/cli_args.py then does `parser.parse_args([])` --
+# discarding sys.argv completely. main.py calls enable_args_parsing() before it
+# imports cli_args; anything else driving ComfyUI has to do the same, or --cpu
+# is accepted in silence and ignored.
 sys.argv = ["main.py", "--cpu"]
+
+import comfy.options  # noqa: E402
+
+comfy.options.enable_args_parsing()
+
+from comfy.cli_args import args  # noqa: E402
+
+assert args.cpu, "enable_args_parsing() did not take effect; --cpu was discarded"
 
 lock = json.loads(Path("/opt/comfyui/nodes.lock.json").read_text())
 failures = []

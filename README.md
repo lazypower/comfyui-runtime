@@ -24,7 +24,7 @@ generated lockfiles, so an image is reproducible from the lock alone.
 Neither image uses a vendor base image. Torch's wheels bundle their own
 accelerator userspace (`nvidia-*` / HIP + rocBLAS + MIOpen); the kernel driver
 comes from the host. Both build from `ubuntu:24.04`, and the entire backend
-delta is one wheel index plus three apt packages.
+delta is one wheel index plus a few apt packages.
 
 |        | index                    | torch          | host wiring |
 |--------|--------------------------|----------------|-------------|
@@ -115,6 +115,11 @@ just inspect wf.json         what does Manager think is missing
 just manifest-of cuda        the pinned set inside a built image
 ```
 
+A host can build the backend it runs rather than pulling it: `just build-one
+cuda`, then `just test-gpu cuda` against the real card. The images are 7–13GB
+and need roughly twice that transiently while the layer is committed, so a
+builder wants ~40GB free.
+
 ### What is provable where
 
 CI runs on GitHub-hosted runners, which have **no GPU**. That bounds what it can
@@ -132,38 +137,14 @@ and must run on the target host. It allocates on-device and does a real matmul,
 because `torch.cuda.is_available()` has returned true on hosts that could not
 then execute anything.
 
-Wiring `test-gpu` into a self-hosted runner on each GPU host would close the
-loop; until then it is a post-deploy step.
-
-### Why the builds are not on-prem
-
-These images are 7–13GB and need roughly twice that transiently while the layer
-is committed. The homelab Firecracker runners have a 16GB rootfs, which cannot
-do it: the CUDA build completes every step and dies writing the final blob, and
-the ROCm torch wheel exhausts the volume *during extraction*, before any
-pruning could run. That is a sizing mismatch, not something the repo can fix.
-
-GitHub-hosted runners start with ~22GB free of ~72GB; the workflow reclaims the
-preinstalled toolchains it never uses and builds both backends with headroom.
-
-You do not need CI to get an image, though. Each host can build the backend it
-runs — `just build-one cuda` — and then `just test-gpu cuda` against real
-hardware in the same place. CI exists for the check a host cannot make
-automatically on every push.
+`just test-gpu <backend>` is a post-deploy step until a runner with the
+matching GPU exists.
 
 ## Deployment
 
-Quadlets live in **core-fleet**, not here. This repo ships images, tests, and
-the justfile. The two units differ only in device wiring — see the backend table
-above.
-
-> **First publish only:** GHCR packages created by Actions are private by
-> default even from a public repo. Set `comfyui` to public once under the
-> package settings, or both hosts will need a pull token. The symptom is a
-> `denied`/`unauthorized` on `podman pull`, which reads like a typo rather than
-> a permissions default.
-
-What the units need to get right:
+This repo ships images, tests, and the justfile; unit files live with the rest
+of your fleet configuration. A unit needs to get four things right — the two
+backends differ only in the first:
 
 - **Device access.** Passing `--device` is not sufficient on its own: `/dev/kfd`
   and `/dev/dri/renderD128` are owned by `render`/`video`. The image creates
@@ -175,7 +156,8 @@ What the units need to get right:
   the owner of the state tree.
 - **No `:z` on the mount** — see the SELinux note above.
 
-The AMD host runs Bazzite, whose base images
-[no longer ship ROCm](https://lunar.computer/bazzite-removes-qemu-and-rocm-from-base-images-20260324).
-That is fine and somewhat the point: the accelerator userspace rides inside the
-torch wheels, so the host only supplies the kernel driver and the device nodes.
+The host does not need ROCm or CUDA installed. Accelerator userspace rides
+inside the torch wheels; the host supplies only the kernel driver and the
+device nodes. Recent Bazzite images
+[no longer ship ROCm](https://lunar.computer/bazzite-removes-qemu-and-rocm-from-base-images-20260324)
+and that is not an obstacle.
