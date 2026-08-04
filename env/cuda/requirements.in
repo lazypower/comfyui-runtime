@@ -61,7 +61,7 @@ chardet
 # --- ComfyUI-Custom-Scripts (609f3afaa74b) -- no requirements.txt
 #   (none)
 
-# --- ComfyUI-KJNodes (1289b52fbb6d)
+# --- ComfyUI-KJNodes (195d312a251e)
 pillow>=10.3.0
 color-matcher
 matplotlib
@@ -86,6 +86,13 @@ ultralytics>=8.3.162
 numpy
 opencv-python-headless
 dill
+
+# --- ComfyUI_IPAdapter_plus (a0f451a5113c) -- no requirements.txt
+#   (none)
+
+# --- ComfyUI_photomakerV2_native (9c6f026fe526)
+insightface==0.7.3
+onnxruntime-gpu==1.23.2
 
 # --- ComfyUI-VideoHelperSuite (4ee72c065db2)
 opencv-python

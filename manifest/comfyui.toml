@@ -103,6 +103,20 @@ repo = "https://github.com/ltdrdata/ComfyUI-Impact-Subpack"
 ref  = "main"
 
 [[nodes]]
+name = "ComfyUI_IPAdapter_plus"
+repo = "https://github.com/cubiq/ComfyUI_IPAdapter_plus"
+ref  = "main"
+
+[[nodes]]
+name = "ComfyUI_photomakerV2_native"
+repo = "https://github.com/zhangp365/ComfyUI_photomakerV2_native"
+ref  = "main"
+# Upstream declares insightface but not the ONNX Runtime implementation that
+# FaceAnalysis imports. The archived Windows runtime carried the GPU package
+# out-of-band through Manager; infrastructure owns it explicitly now.
+runtime_requirements = ["onnxruntime-gpu==1.23.2"]
+
+[[nodes]]
 name = "ComfyUI-VideoHelperSuite"
 repo = "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
 ref  = "main"

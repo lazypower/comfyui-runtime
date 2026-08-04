@@ -119,6 +119,11 @@ def cmd_resolve() -> None:
                 "ref": node["ref"],
                 "commit": ls_remote(node["repo"], node["ref"]),
                 **({"role": node["role"]} if "role" in node else {}),
+                **(
+                    {"runtime_requirements": node["runtime_requirements"]}
+                    if "runtime_requirements" in node
+                    else {}
+                ),
             }
         )
 
@@ -253,9 +258,12 @@ def cmd_collect(backend: str) -> None:
         body = fetch_requirements(node["repo"], node["commit"])
         label = f"{node['name']} ({node['commit'][:12]})"
         if body is None:
-            sections.append((f"{label} -- no requirements.txt", []))
-            continue
-        sections.append((label, clean(body, node["name"], python_sources)))
+            requirements = []
+            label = f"{label} -- no requirements.txt"
+        else:
+            requirements = clean(body, node["name"], python_sources)
+        requirements.extend(node.get("runtime_requirements", []))
+        sections.append((label, requirements))
 
     out = ROOT / "env" / backend / "requirements.in"
     out.parent.mkdir(parents=True, exist_ok=True)

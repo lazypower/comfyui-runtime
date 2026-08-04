@@ -74,6 +74,18 @@ def test_lock_covers_exactly_the_declared_nodes():
     )
 
 
+def test_lock_preserves_declared_node_runtime_requirements():
+    declared = {
+        node["name"]: node.get("runtime_requirements", [])
+        for node in MANIFEST["nodes"]
+    }
+    locked = {
+        node["name"]: node.get("runtime_requirements", [])
+        for node in LOCK["nodes"]
+    }
+    assert declared == locked
+
+
 def test_node_names_are_unique():
     names = [n["name"] for n in MANIFEST["nodes"]]
     assert len(names) == len(set(names))

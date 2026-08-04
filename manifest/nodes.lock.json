@@ -68,7 +68,7 @@
       "name": "ComfyUI-KJNodes",
       "repo": "https://github.com/kijai/ComfyUI-KJNodes",
       "ref": "main",
-      "commit": "1289b52fbb6d64a339a4047b9ea74cf7758ccf1e"
+      "commit": "195d312a251efdc484c3d9c4570914ab2da9da54"
     },
     {
       "name": "ComfyUI-Impact-Pack",
@@ -81,6 +81,21 @@
       "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
       "ref": "main",
       "commit": "50c7b71a6a224734cc9b21963c6d1926816a97f1"
+    },
+    {
+      "name": "ComfyUI_IPAdapter_plus",
+      "repo": "https://github.com/cubiq/ComfyUI_IPAdapter_plus",
+      "ref": "main",
+      "commit": "a0f451a5113cf9becb0847b92884cb10cbdec0ef"
+    },
+    {
+      "name": "ComfyUI_photomakerV2_native",
+      "repo": "https://github.com/zhangp365/ComfyUI_photomakerV2_native",
+      "ref": "main",
+      "commit": "9c6f026fe526f44b78f7bde6bdf2667f4d4ef413",
+      "runtime_requirements": [
+        "onnxruntime-gpu==1.23.2"
+      ]
     },
     {
       "name": "ComfyUI-VideoHelperSuite",

@@ -54,7 +54,7 @@ LABEL org.opencontainers.image.title="comfyui-${BACKEND}" \
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      ca-certificates git libgl1 libglib2.0-0 tini ${BACKEND_APT} \
+      build-essential ca-certificates git libgl1 libglib2.0-0 tini ${BACKEND_APT} \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /usr/local/bin/uv
@@ -124,6 +124,7 @@ RUN python3 /build/scripts/pin.py fetch /opt/comfyui \
  && python3 /build/scripts/pin.py prune ${BACKEND} /opt/comfyui/.venv \
  && /opt/comfyui/.venv/bin/python -c \
       "import torch; print('torch', torch.__version__, 'imports after prune')" \
+ && apt-get purge -y --auto-remove build-essential \
  && find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
  && find /opt/comfyui -name '__pycache__' -type d -prune -exec rm -rf {} + \
  && rm -rf /build \
