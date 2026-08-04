@@ -41,7 +41,12 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Ensure python3
-        run: command -v python3 || microdnf install -y python3
+        run: |
+          command -v python3 && exit 0
+          command -v microdnf && exec microdnf install -y python3
+          command -v dnf      && exec dnf -y install python3
+          echo "no python3 and no known package manager on this runner" >&2
+          exit 1
 
       - name: Read build args from the lock
         id: args
@@ -54,15 +59,26 @@ jobs:
           print(f"python={lock['runtime']['python']}")
           PY
 
+      - name: Disk before build
+        run: df -h /var/lib/containers /var /home 2>/dev/null || df -h
+
+      # --layers=false: these VMs keep no state between jobs, so per-instruction
+      # layer caching buys nothing and costs a full extra copy of a ~10GB tree.
       - name: Build
         run: |
-          podman build --net=host \
+          podman build --net=host --layers=false \
             --file containers/Containerfile \
             --build-arg BACKEND=${{ matrix.backend }} \
             --build-arg BACKEND_APT="${{ steps.args.outputs.apt }}" \
             --build-arg PYTHON_VERSION="${{ steps.args.outputs.python }}" \
             --tag comfyui:ci-${{ matrix.backend }} \
             .
+
+      - name: Disk after build
+        if: always()
+        run: |
+          df -h /var/lib/containers /var /home 2>/dev/null || df -h
+          podman images --format '{{.Repository}}:{{.Tag}} {{.Size}}'
 
       # Everything a GPU-less microVM can prove: dependency closure resolves and
       # hash-verifies, every pinned node imports, the venv is immutable, the

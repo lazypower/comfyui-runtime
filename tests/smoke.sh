@@ -24,7 +24,10 @@ mounted() { "$ENGINE" run --rm ${RUN_ARGS:-} --volume "$STATE:/var/mnt/diffusion
 echo "smoke: $IMAGE ($BACKEND)"
 
 # --- durable state is mandatory ---------------------------------------------
-if out=$("$ENGINE" run --rm --entrypoint /usr/local/bin/entrypoint "$IMAGE" --cpu 2>&1); then
+# RUN_ARGS matters even here: without --net=host on a Firecracker runner the
+# container never starts, and this would "fail" for the wrong reason.
+# shellcheck disable=SC2086
+if out=$("$ENGINE" run --rm ${RUN_ARGS:-} --entrypoint /usr/local/bin/entrypoint "$IMAGE" --cpu 2>&1); then
     bad "started without durable state mounted (would write into the image layer)"
 elif grep -q "not a mount point" <<<"$out"; then
     ok "refuses to start without durable state mounted"
@@ -74,7 +77,9 @@ mounted --entrypoint bash "$IMAGE" -c \
 check $? "caches are redirected onto durable state"
 
 # --- it actually serves ------------------------------------------------------
-cid=$(mounted -d -P --entrypoint /usr/local/bin/entrypoint "$IMAGE" \
+# No -P: every probe below goes through `exec`, so nothing needs publishing --
+# and `-P` conflicts with the --net=host that Firecracker requires.
+cid=$(mounted -d --entrypoint /usr/local/bin/entrypoint "$IMAGE" \
         --cpu --listen 127.0.0.1 --port 8188 2>/dev/null)
 if [ -n "$cid" ]; then
     booted=1
