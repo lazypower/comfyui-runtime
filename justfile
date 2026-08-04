@@ -86,7 +86,7 @@ test-gpu backend tag="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{backend}}" in
-      cuda) dev=(--device nvidia.com/gpu=all) ;;
+      cuda) dev=(--device nvidia.com/gpu=all --security-opt=label=disable) ;;
       rocm) dev=(--device /dev/kfd --device /dev/dri --group-add keep-groups) ;;
       *) echo "unknown backend {{backend}}" >&2; exit 1 ;;
     esac
@@ -100,7 +100,7 @@ run backend="cuda" tag="dev":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{backend}}" in
-      cuda) dev=(--device nvidia.com/gpu=all) ;;
+      cuda) dev=(--device nvidia.com/gpu=all --security-opt=label=disable) ;;
       rocm) dev=(--device /dev/kfd --device /dev/dri --group-add keep-groups) ;;
     esac
     {{engine}} run --rm -it {{run_args}} \

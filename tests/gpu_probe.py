@@ -18,7 +18,11 @@ print(f"available  {available}")
 
 if not available:
     print("\nNo accelerator visible. Check device wiring:", file=sys.stderr)
-    print("  nvidia -> --device nvidia.com/gpu=all (CDI configured on host)", file=sys.stderr)
+    print(
+        "  nvidia -> --device nvidia.com/gpu=all --security-opt=label=disable "
+        "(CDI configured on host)",
+        file=sys.stderr,
+    )
     print("  amd    -> --device /dev/kfd --device /dev/dri --group-add keep-groups", file=sys.stderr)
     sys.exit(1)
 

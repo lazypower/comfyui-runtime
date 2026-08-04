@@ -28,7 +28,7 @@ delta is one wheel index plus a few apt packages.
 
 |        | index                    | torch          | host wiring |
 |--------|--------------------------|----------------|-------------|
-| `cuda` | `.../whl/cu130`          | `2.13.0+cu130` | CDI: `--device nvidia.com/gpu=all` |
+| `cuda` | `.../whl/cu130`          | `2.13.0+cu130` | CDI: `--device nvidia.com/gpu=all --security-opt=label=disable` |
 | `rocm` | `.../whl/rocm7.1`        | `2.13.0+rocm7.1` | `--device /dev/kfd --device /dev/dri --group-add keep-groups` |
 
 Same torch version on both, deliberately — custom nodes then behave identically
