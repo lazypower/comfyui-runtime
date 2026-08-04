@@ -114,7 +114,7 @@ run backend="cuda" tag="dev":
 init-state:
     #!/usr/bin/env bash
     set -euo pipefail
-    for d in models/{checkpoints,clip,clip_vision,configs,controlnet,diffusers,diffusion_models,embeddings,gligen,hypernetworks,loras,photomaker,style_models,text_encoders,upscale_models,vae,vae_approx} \
+    for d in models/{audio_encoders,checkpoints,clip,clip_vision,configs,controlnet,diffusers,diffusion_models,embeddings,flux,gligen,hypernetworks,instantid,ipadapter,latent_upscale_models,loras,model_patches,motion_models,onnx,other,photomaker,poses,sams,style_models,text_encoders,unet,upscale_models,ultralytics/bbox,ultralytics/segm,vae,vae_approx,wildcards,xlabs} \
              input output user cache custom_nodes.dev; do
         mkdir -p "{{state}}/$d"
     done

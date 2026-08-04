@@ -254,6 +254,25 @@ def test_entrypoint_refuses_a_writable_production_environment():
     assert "-w " in body and ".venv" in body
 
 
+def test_model_paths_follow_the_durable_state_authority():
+    body = (ROOT / "containers" / "extra_model_paths.yaml").read_text()
+    assert "base_path: ${COMFY_STATE}/models" in body
+    assert "/var/mnt/diffusion/models" not in body
+
+
+@pytest.mark.parametrize(
+    "model_path",
+    (
+        "ultralytics: ultralytics",
+        "ultralytics_bbox: ultralytics/bbox",
+        "ultralytics_segm: ultralytics/segm",
+    ),
+)
+def test_impact_detector_models_live_on_durable_state(model_path):
+    body = (ROOT / "containers" / "extra_model_paths.yaml").read_text()
+    assert model_path in body
+
+
 def test_image_runs_as_a_non_root_user():
     body = (ROOT / "containers" / "Containerfile").read_text()
     assert re.search(r"^USER comfy$", body, re.M), "runtime stage must drop to comfy"

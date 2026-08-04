@@ -3,27 +3,47 @@
 # thing in both places -- worth more than it sounds at 2am.
 
 comfyui:
-  base_path: /var/mnt/diffusion/models
+  # COMFY_STATE is the single authority for the durable-state mount. Hosts may
+  # use /var/mnt/diffusion, /var/mnt/Remote, or another absolute mount without
+  # having to rebuild the image or maintain a second model-path config.
+  base_path: ${COMFY_STATE}/models
   is_default: true
 
+  audio_encoders: audio_encoders
   checkpoints: checkpoints
   clip: clip
   clip_vision: clip_vision
   configs: configs
   controlnet: controlnet
   diffusers: diffusers
-  diffusion_models: diffusion_models
+  diffusion_models: |
+    diffusion_models
+    unet
   embeddings: embeddings
+  flux: flux
   gligen: gligen
   hypernetworks: hypernetworks
+  instantid: instantid
+  ipadapter: ipadapter
+  latent_upscale_models: latent_upscale_models
   loras: loras
+  model_patches: model_patches
+  motion_models: motion_models
+  onnx: onnx
+  other: other
   photomaker: photomaker
+  poses: poses
+  sams: sams
   style_models: style_models
   text_encoders: text_encoders
-  unet: diffusion_models
   upscale_models: upscale_models
+  ultralytics: ultralytics
+  ultralytics_bbox: ultralytics/bbox
+  ultralytics_segm: ultralytics/segm
   vae: vae
   vae_approx: vae_approx
+  wildcards: wildcards
+  xlabs: xlabs
 
   # Development scratch. Nodes here load, but the venv is read-only -- so a node
   # needing Python dependencies WILL fail to import here. That failure is the
