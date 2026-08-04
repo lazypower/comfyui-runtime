@@ -21,7 +21,8 @@
       "apt": [
         "libnuma1",
         "libdrm2",
-        "libelf1"
+        "libelf1",
+        "libatomic1"
       ],
       "description": "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri.",
       "gpu_archs": [

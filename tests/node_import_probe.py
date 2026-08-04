@@ -12,6 +12,13 @@ from pathlib import Path
 
 sys.path.insert(0, "/opt/comfyui")
 
+# ComfyUI parses sys.argv at import of comfy.cli_args, and importing almost any
+# custom node reaches comfy.model_management, which selects a device eagerly and
+# raises "Found no NVIDIA driver on your system" on a GPU-less machine. Ask for
+# CPU before anything comfy-related loads, or this probe only ever passes on a
+# host that has the very hardware it is meant to not need.
+sys.argv = ["main.py", "--cpu"]
+
 lock = json.loads(Path("/opt/comfyui/nodes.lock.json").read_text())
 failures = []
 

@@ -44,7 +44,7 @@ prune_packages = ["nvidia-nccl-cu13", "nvidia-nvshmem-cu13", "nvidia-cufile"]
 # If the AMD host's amdgpu kernel driver is too old for ROCm 7, change this one
 # line back to rocm6.4 and re-lock -- everything else is unaffected.
 index       = "https://download.pytorch.org/whl/rocm7.1"
-apt         = ["libnuma1", "libdrm2", "libelf1"]
+apt         = ["libnuma1", "libdrm2", "libelf1", "libatomic1"]
 description = "AMD RX 7900 XTX (gfx1100). HIP/rocBLAS/MIOpen ship inside the torch wheels; needs /dev/kfd + /dev/dri."
 # The ROCm wheel ships precompiled MIOpen databases and rocBLAS/hipBLASLt
 # Tensile kernels for every supported architecture -- roughly twenty of them,

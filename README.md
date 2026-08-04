@@ -155,7 +155,15 @@ automatically on every push.
 
 Quadlets live in **core-fleet**, not here. This repo ships images, tests, and
 the justfile. The two units differ only in device wiring — see the backend table
-above. What the units need to get right:
+above.
+
+> **First publish only:** GHCR packages created by Actions are private by
+> default even from a public repo. Set `comfyui` to public once under the
+> package settings, or both hosts will need a pull token. The symptom is a
+> `denied`/`unauthorized` on `podman pull`, which reads like a typo rather than
+> a permissions default.
+
+What the units need to get right:
 
 - **Device access.** Passing `--device` is not sufficient on its own: `/dev/kfd`
   and `/dev/dri/renderD128` are owned by `render`/`video`. The image creates
