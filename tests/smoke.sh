@@ -148,6 +148,17 @@ info = json.load(urllib.request.urlopen("http://127.0.0.1:8188/object_info", tim
 sys.exit(0 if "SmokeProbeNode" in info else 1)' >/dev/null 2>&1
     check $? "a node in the dev mount loads without a rebuild"
 
+    # The database default is computed from the source tree, not the user
+    # directory, so it silently lands in the ephemeral layer unless overridden.
+    if "$ENGINE" logs "$cid" 2>&1 | grep -q "Failed to initialize database"; then
+        bad "database initialises"
+    else
+        ok "database initialises"
+    fi
+
+    "$ENGINE" exec "$cid" test -f /var/mnt/diffusion/user/comfyui.db 2>/dev/null
+    check $? "database lives on durable state"
+
     "$ENGINE" rm -f "$cid" >/dev/null 2>&1
 else
     bad "container failed to start"

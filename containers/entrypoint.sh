@@ -47,6 +47,11 @@ export GIT_TERMINAL_PROMPT=0
 
 echo "comfyui: backend=${COMFY_BACKEND:-unknown} state=$STATE uid=$(id -u)"
 
+# --database-url is NOT covered by --user-directory. comfy/cli_args.py:238
+# computes its default at import time as <comfy>/../user/comfyui.db and never
+# consults the user directory, so without this the database lands in the
+# container's ephemeral layer -- workflow metadata silently discarded on every
+# restart, which is precisely what externalising state exists to prevent.
 exec python "$COMFY_ROOT/main.py" \
   --base-directory       "$COMFY_ROOT" \
   --extra-model-paths-config "$COMFY_ROOT/extra_model_paths.yaml" \
@@ -54,4 +59,5 @@ exec python "$COMFY_ROOT/main.py" \
   --output-directory     "$STATE/output" \
   --user-directory       "$STATE/user" \
   --temp-directory       "$STATE/cache/temp" \
+  --database-url         "sqlite:///$STATE/user/comfyui.db" \
   "$@"

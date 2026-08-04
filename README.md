@@ -51,7 +51,7 @@ container, so paths in workflows and logs mean the same thing in both places.
 /var/mnt/diffusion/
   models/            model tree (extra_model_paths.yaml, is_default)
   input/  output/    --input-directory / --output-directory
-  user/              workflows and settings
+  user/              workflows, settings, comfyui.db
   cache/             HF_HOME, TORCH_HOME, XDG_CACHE_HOME, temp
   custom_nodes.dev/  development scratch -- see below
 ```
