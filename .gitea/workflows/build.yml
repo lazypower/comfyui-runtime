@@ -25,7 +25,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Lockfiles agree with pinned commits
-        run: bash scripts/lock-check.sh
+        run: python3 scripts/lock_check.py
 
       - name: Manifest checks
         run: uv run --with pytest python -m pytest tests/test_manifest.py -q

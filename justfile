@@ -40,9 +40,9 @@ compile backend:
         --custom-compile-command "just compile {{backend}}"
 
 # CI gate: do the committed lockfiles still agree with the committed pins?
-# Shared with CI -- see scripts/lock-check.sh for why it does not re-resolve.
+# Shared with CI -- see scripts/lock_check.py for why it does not re-resolve.
 lock-check:
-    bash scripts/lock-check.sh
+    python3 scripts/lock_check.py
 
 # ---------------------------------------------------------------- building
 
