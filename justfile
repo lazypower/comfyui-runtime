@@ -1,7 +1,7 @@
 # ComfyUI images -- one definition, two pinned backends.
 
 engine   := env("CONTAINER_ENGINE", "podman")
-registry := env("REGISTRY", "gitea.wabash.place/containers")
+registry := env("REGISTRY", "ghcr.io/lazypower")
 platform := "linux/amd64"
 state    := env("COMFY_STATE", "/var/mnt/diffusion")
 

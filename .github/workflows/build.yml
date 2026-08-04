@@ -1,0 +1,105 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/lazypower/comfyui
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Lockfiles agree with pinned commits
+        run: python3 scripts/lock_check.py
+
+      - name: Manifest and prune-logic checks
+        run: uv run --with pytest python -m pytest tests/ -q
+
+  image:
+    runs-on: ubuntu-latest
+    needs: static
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [cuda, rocm]
+    steps:
+      # These images are 7-13GB and need roughly twice that transiently while
+      # the layer is committed. A stock runner starts with ~22GB free of ~72GB,
+      # most of it preinstalled toolchains this build never touches.
+      #
+      # Inlined rather than using a marketplace action on purpose: this job
+      # holds packages:write against the registry, and six lines of rm is a
+      # smaller thing to trust than a third-party action with push rights.
+      - name: Reclaim disk
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/share/boost /usr/share/swift \
+                      /usr/local/lib/node_modules /opt/hostedtoolcache
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - uses: actions/checkout@v5
+
+      - name: Read build args from the lock
+        id: args
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          lock = json.load(open("manifest/nodes.lock.json"))
+          backend = "${{ matrix.backend }}"
+          print(f"apt={' '.join(lock['backends'][backend]['apt'])}")
+          print(f"python={lock['runtime']['python']}")
+          PY
+
+      - name: Build
+        run: |
+          docker build \
+            --file containers/Containerfile \
+            --build-arg BACKEND=${{ matrix.backend }} \
+            --build-arg BACKEND_APT="${{ steps.args.outputs.apt }}" \
+            --build-arg PYTHON_VERSION="${{ steps.args.outputs.python }}" \
+            --tag comfyui:ci-${{ matrix.backend }} \
+            .
+
+      - name: Disk after build
+        if: always()
+        run: df -h / && docker images comfyui --format '{{.Repository}}:{{.Tag}} {{.Size}}'
+
+      # Everything a GPU-less runner can prove: the dependency closure resolves
+      # and hash-verifies, every pinned node imports, the venv is immutable, the
+      # state mount is enforced, ComfyUI registers its nodes and serves on CPU,
+      # and the torch wheel is the correct accelerator variant.
+      #
+      # What it CANNOT prove: that kernels actually run. `just test-gpu` covers
+      # that and must run on the target host -- see README.
+      - name: Runtime contract (no GPU required)
+        env:
+          ENGINE: docker
+          IMAGE: comfyui:ci-${{ matrix.backend }}
+          BACKEND: ${{ matrix.backend }}
+        run: bash tests/smoke.sh
+
+      - name: Push
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+          short="$(echo "${{ github.sha }}" | cut -c1-12)"
+          for tag in "main-${{ matrix.backend }}" "$short-${{ matrix.backend }}"; do
+            docker tag comfyui:ci-${{ matrix.backend }} "$IMAGE:$tag"
+            docker push "$IMAGE:$tag"
+          done

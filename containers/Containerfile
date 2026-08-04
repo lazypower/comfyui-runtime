@@ -50,7 +50,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 LABEL org.opencontainers.image.title="comfyui-${BACKEND}" \
       org.opencontainers.image.description="ComfyUI, ${BACKEND} backend, pinned environment" \
-      org.opencontainers.image.source="https://gitea.wabash.place/containers/ComfyUI"
+      org.opencontainers.image.source="https://github.com/lazypower/comfyui-runtime"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

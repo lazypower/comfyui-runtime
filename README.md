@@ -1,6 +1,7 @@
-# ComfyUI
+# ComfyUI runtime
 
-One definition, two pinned images: `comfyui:<tag>-cuda` and `comfyui:<tag>-rocm`.
+One definition, two pinned images, published to
+`ghcr.io/lazypower/comfyui:main-cuda` and `ghcr.io/lazypower/comfyui:main-rocm`.
 
 Deterministic runtime, externalized durable state. The image is a complete,
 immutable description of the running system; everything that accumulates bytes
@@ -116,7 +117,7 @@ just manifest-of cuda        the pinned set inside a built image
 
 ### What is provable where
 
-CI runs on Firecracker microVMs, which have **no GPU**. That bounds what it can
+CI runs on GitHub-hosted runners, which have **no GPU**. That bounds what it can
 claim, but less than it sounds — the common failure is a node whose dependency
 never made it into the lock, and that is fully provable on CPU.
 
@@ -131,8 +132,24 @@ and must run on the target host. It allocates on-device and does a real matmul,
 because `torch.cuda.is_available()` has returned true on hosts that could not
 then execute anything.
 
-Wiring `test-gpu` into a Gitea runner labelled for each GPU host would close the
+Wiring `test-gpu` into a self-hosted runner on each GPU host would close the
 loop; until then it is a post-deploy step.
+
+### Why the builds are not on-prem
+
+These images are 7–13GB and need roughly twice that transiently while the layer
+is committed. The homelab Firecracker runners have a 16GB rootfs, which cannot
+do it: the CUDA build completes every step and dies writing the final blob, and
+the ROCm torch wheel exhausts the volume *during extraction*, before any
+pruning could run. That is a sizing mismatch, not something the repo can fix.
+
+GitHub-hosted runners start with ~22GB free of ~72GB; the workflow reclaims the
+preinstalled toolchains it never uses and builds both backends with headroom.
+
+You do not need CI to get an image, though. Each host can build the backend it
+runs — `just build-one cuda` — and then `just test-gpu cuda` against real
+hardware in the same place. CI exists for the check a host cannot make
+automatically on every push.
 
 ## Deployment
 
