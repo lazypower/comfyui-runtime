@@ -66,9 +66,14 @@ declared volume would be auto-created on an unmounted run and satisfy that check
 Run `just label-state` **once** before the first container start:
 
 ```
-semanage fcontext -a -t container_file_t '/var/mnt/diffusion(/.*)?'
+semanage fcontext -a -t container_file_t '/mnt/diffusion(/.*)?'
 restorecon -RF /var/mnt/diffusion
 ```
+
+Note the spec says `/mnt`, not `/var/mnt`. SELinux ships an equivalency rule
+making the two the same, and `semanage` rejects the alias outright — *"File
+spec /var/mnt/diffusion(/.\*)? conflicts with equivalency rule '/var/mnt
+/mnt'"*. `restorecon` still takes the real path.
 
 Deliberately not a `:z` mount flag. `:z` relabels the entire tree on every
 container start — across a multi-terabyte model directory that is minutes to

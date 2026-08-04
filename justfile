@@ -133,13 +133,22 @@ label-state:
     #!/usr/bin/env bash
     set -euo pipefail
     if ! command -v semanage >/dev/null; then
-        echo "semanage not found; on Bazzite: rpm-ostree install policycoreutils-python-utils" >&2
+        echo "semanage not found; install policycoreutils-python-utils" >&2
+        echo "  rpm-ostree install policycoreutils-python-utils   (reboot required)" >&2
         exit 1
     fi
-    sudo semanage fcontext -a -t container_file_t '{{state}}(/.*)?' 2>/dev/null \
-      || sudo semanage fcontext -m -t container_file_t '{{state}}(/.*)?'
+    # SELinux ships an equivalency rule making /var/mnt an alias of /mnt, and
+    # fcontext specs must name the canonical path -- semanage rejects the alias
+    # outright ("conflicts with equivalency rule '/var/mnt /mnt'"). restorecon
+    # still takes the real path; only the spec is rewritten.
+    spec='{{state}}'
+    case "$spec" in
+        /var/mnt/*) spec="${spec#/var}" ;;
+    esac
+    sudo semanage fcontext -a -t container_file_t "${spec}(/.*)?" 2>/dev/null \
+      || sudo semanage fcontext -m -t container_file_t "${spec}(/.*)?"
     sudo restorecon -RvF {{state}}
-    echo "{{state}} labelled container_file_t (persistent)"
+    echo "{{state}} labelled container_file_t via ${spec} (persistent)"
 
 # What did Manager find missing for a given workflow? Inspection only.
 inspect workflow backend="cuda" tag="dev":
