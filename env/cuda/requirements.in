@@ -61,7 +61,7 @@ chardet
 # --- ComfyUI-Custom-Scripts (609f3afaa74b) -- no requirements.txt
 #   (none)
 
-# --- ComfyUI-KJNodes (195d312a251e)
+# --- ComfyUI-KJNodes (6ab7e8130e44)
 pillow>=10.3.0
 color-matcher
 matplotlib
@@ -97,3 +97,17 @@ onnxruntime-gpu==1.23.2
 # --- ComfyUI-VideoHelperSuite (4ee72c065db2)
 opencv-python
 imageio-ffmpeg
+
+# --- ComfyUI-SeedVR2_VideoUpscaler (4490bd1f482e)
+safetensors
+numpy
+tqdm
+psutil
+einops
+omegaconf>=2.3.0
+diffusers>=0.33.1
+peft>=0.17.0
+rotary_embedding_torch>=0.5.3
+opencv-python
+gguf
+matplotlib

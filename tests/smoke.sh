@@ -95,6 +95,19 @@ check $? "nodes can create front-end extension dirs in the app tree"
 mounted --entrypoint python "$IMAGE" -c 'import torch; print(torch.__version__)' >/dev/null 2>&1
 check $? "torch imports"
 
+# Triton builds a native launcher on first use for some model kernels. A plain
+# torch import does not exercise that path, so prove the runtime image retains
+# a working compiler and the standard C headers rather than checking only that
+# a compiler-shaped executable exists.
+mounted --entrypoint bash "$IMAGE" -c '
+    probe_dir=$(mktemp -d)
+    trap '\''rm -rf "$probe_dir"'\'' EXIT
+    printf '\''#include <stdlib.h>\nint main(void) { return EXIT_SUCCESS; }\n'\'' > "$probe_dir/probe.c"
+    cc "$probe_dir/probe.c" -o "$probe_dir/probe"
+    "$probe_dir/probe"
+' >/dev/null 2>&1
+check $? "runtime C compiler works for Triton JIT"
+
 # Which accelerator the wheel was BUILT for is a property of the wheel, not the
 # machine -- so this holds on a GPU-less CI runner. It is also the check that
 # catches the silent killer: a ROCm image that quietly shipped the generic
@@ -110,6 +123,11 @@ case "$BACKEND" in
               ok "torch is a ROCm build (${ver}, hip ${hip_ver})"
           else bad "expected a ROCm build, got version=$ver cuda=$cuda_ver hip=$hip_ver"; fi ;;
 esac
+
+if [ "$BACKEND" = rocm ]; then
+    mounted --entrypoint test "$IMAGE" -r /opt/amdgpu/share/libdrm/amdgpu.ids 2>/dev/null
+    check $? "ROCm can resolve AMD product names"
+fi
 
 # every pinned node must import -- a node that only fails at workflow-load time
 # is a node that fails in front of you, not in CI

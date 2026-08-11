@@ -18,9 +18,11 @@ mountpoint -q "$STATE" || [ -n "${COMFY_ALLOW_UNMOUNTED_STATE:-}" ] \
   || die "$STATE is not a mount point. Bind-mount durable state, or set COMFY_ALLOW_UNMOUNTED_STATE=1 for throwaway runs."
 
 for d in models input output user cache custom_nodes.dev; do
-  mkdir -p "$STATE/$d" 2>/dev/null || die "cannot create $STATE/$d -- check mount ownership (expected uid $(id -u))"
+  mkdir -p "$STATE/$d" 2>/dev/null \
+    || die "cannot create $STATE/$d -- check mount ownership (expected uid $(id -u)) and SELinux labeling ('just label-state')"
 done
-[ -w "$STATE/output" ] || die "$STATE/output is not writable by uid $(id -u)"
+[ -w "$STATE/output" ] \
+  || die "$STATE/output is not writable by uid $(id -u); on SELinux hosts run 'just label-state'"
 
 # --- 2. the environment is immutable ---------------------------------------
 # Enforced by ownership, not politeness: root owns /opt/comfyui, we are not root.

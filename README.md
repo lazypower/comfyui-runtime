@@ -117,6 +117,84 @@ Those writes land in the container's upper layer and vanish on restart, so
 drift cannot accumulate across restarts and the image still describes the
 system every time it starts.
 
+## Wan 2.2 ROCm smoke workflow
+
+[`workflows/wan2.2-ti2v-5b-rocm-smoke.json`](workflows/wan2.2-ti2v-5b-rocm-smoke.json)
+is an image-to-video test derived from ComfyUI's official Wan 2.2 TI2V 5B
+template. It uses core nodes only; no additional custom node or CUDA extension
+is required. Its deliberately small first-run defaults are 768x512, 49 frames,
+16 fps, 20 steps, and batch size 1.
+
+Install these model files in durable state:
+
+```
+/var/mnt/diffusion/models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors
+/var/mnt/diffusion/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+/var/mnt/diffusion/models/vae/wan2.2_vae.safetensors
+```
+
+Import the JSON in ComfyUI, choose the source image in `Load Image`, and queue
+the workflow. `just inspect workflows/wan2.2-ti2v-5b-rocm-smoke.json rocm main`
+can be used against the published image to confirm that every node is present.
+
+For a higher-fidelity image-to-video check,
+[`workflows/wan2.2-i2v-14b-fp8-rocm-smoke.json`](workflows/wan2.2-i2v-14b-fp8-rocm-smoke.json)
+uses Wan 2.2's native two-expert 14B graph. The high-noise model runs steps
+0-10, then hands the same latent to the low-noise model for steps 10-20. Its
+first-run defaults are 640x640, 49 frames, 16 fps, CFG 3.5, and batch size 1.
+The square frame matches the bundled Charly test image without increasing the
+pixel count materially over the 5B smoke test.
+
+Install these model files in durable state (the UMT5 encoder can be shared with
+the 5B workflow):
+
+```
+/var/mnt/diffusion/models/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+/var/mnt/diffusion/models/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+/var/mnt/diffusion/models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+/var/mnt/diffusion/models/vae/wan_2.1_vae.safetensors
+```
+
+The 14B graph also uses core nodes only. Import it, select the source image,
+and leave both diffusion loaders at their `default` weight datatype because
+the files already contain scaled FP8 weights.
+
+## SeedVR2 4K video upscale
+
+[`workflows/seedvr2-4k-video-upscale-rocm.json`](workflows/seedvr2-4k-video-upscale-rocm.json)
+upscales a completed video with temporally-aware SeedVR2 rather than treating
+every frame as an unrelated image. Its ROCm baseline targets a 2160-pixel short
+edge with a 3840-pixel long-edge cap: 16:9 input becomes 3840x2160, portrait
+input becomes 2160x3840, and square Wan output remains 2160x2160.
+
+The first-run profile is deliberately conservative for the RX 7900 XTX:
+
+- SeedVR2 3B FP8 DiT with PyTorch SDPA (no CUDA-only attention extension)
+- five-frame temporal batches with three-frame overlap
+- LAB color correction and no injected input or latent noise
+- 768-pixel VAE encode/decode tiles with 128-pixel overlap
+- 16 DiT blocks swapped to CPU; raise this to 24 or 32 if the DiT phase OOMs
+- `torch.compile` disabled until eager-mode execution succeeds
+
+Install the pinned custom node by rebuilding the image, and fetch the two model
+files into durable state:
+
+```
+just seedvr2-models
+```
+
+This installs and SHA-256 verifies approximately 3.9 GB under:
+
+```
+/var/mnt/diffusion/models/SEEDVR2/seedvr2_ema_3b_fp8_e4m3fn.safetensors
+/var/mnt/diffusion/models/SEEDVR2/ema_vae_fp16.safetensors
+```
+
+Import the workflow, upload the completed Wan MP4 in `Load Video`, and queue it.
+The source frame rate and audio (when present) pass through unchanged. For the
+first smoke test, use a short 49-frame clip; a 4K frame batch consumes much more
+host memory than the original Wan frames even when GPU tiling is enabled.
+
 ## Operating
 
 ```
