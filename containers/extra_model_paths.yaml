@@ -34,6 +34,7 @@ comfyui:
   photomaker: photomaker
   poses: poses
   sams: sams
+  seedvr2: SEEDVR2
   style_models: style_models
   text_encoders: text_encoders
   upscale_models: upscale_models

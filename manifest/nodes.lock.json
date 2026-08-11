@@ -68,7 +68,7 @@
       "name": "ComfyUI-KJNodes",
       "repo": "https://github.com/kijai/ComfyUI-KJNodes",
       "ref": "main",
-      "commit": "195d312a251efdc484c3d9c4570914ab2da9da54"
+      "commit": "6ab7e8130e449ed2c0037589bcf84146ceb7fc9c"
     },
     {
       "name": "ComfyUI-Impact-Pack",
@@ -102,6 +102,12 @@
       "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
       "ref": "main",
       "commit": "4ee72c065db22c9d96c2427954dc69e7b908444b"
+    },
+    {
+      "name": "ComfyUI-SeedVR2_VideoUpscaler",
+      "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
+      "ref": "main",
+      "commit": "4490bd1f482e026674543386bb2a4d176da245b9"
     }
   ]
 }

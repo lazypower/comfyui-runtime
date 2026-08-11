@@ -114,7 +114,7 @@ run backend="cuda" tag="dev":
 init-state:
     #!/usr/bin/env bash
     set -euo pipefail
-    for d in models/{audio_encoders,checkpoints,clip,clip_vision,configs,controlnet,diffusers,diffusion_models,embeddings,flux,gligen,hypernetworks,instantid,ipadapter,latent_upscale_models,loras,model_patches,motion_models,onnx,other,photomaker,poses,sams,style_models,text_encoders,unet,upscale_models,ultralytics/bbox,ultralytics/segm,vae,vae_approx,wildcards,xlabs} \
+    for d in models/{SEEDVR2,audio_encoders,checkpoints,clip,clip_vision,configs,controlnet,diffusers,diffusion_models,embeddings,flux,gligen,hypernetworks,instantid,ipadapter,latent_upscale_models,loras,model_patches,motion_models,onnx,other,photomaker,poses,sams,style_models,text_encoders,unet,upscale_models,ultralytics/bbox,ultralytics/segm,vae,vae_approx,wildcards,xlabs} \
              input output user cache custom_nodes.dev; do
         mkdir -p "{{state}}/$d"
     done
@@ -122,6 +122,29 @@ init-state:
     if command -v getenforce >/dev/null && [ "$(getenforce)" != Disabled ]; then
         echo "SELinux is $(getenforce) -- run 'just label-state' before first container start"
     fi
+
+# Install the two SeedVR2 files used by the ROCm 4K workflow into durable state.
+# Downloads resume after interruption and are only promoted after their upstream
+# hashes match, so ComfyUI never discovers a partial model as a usable file.
+seedvr2-models:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    model_dir="{{state}}/models/SEEDVR2"
+    mkdir -p "$model_dir"
+    base="https://huggingface.co/numz/SeedVR2_comfyUI/resolve/main"
+    fetch() {
+        local name="$1" expected="$2" part="$model_dir/$1.part"
+        if [ -f "$model_dir/$name" ] && printf '%s  %s\n' "$expected" "$model_dir/$name" | sha256sum --check --status; then
+            echo "$name already present and verified"
+            return
+        fi
+        curl --fail --location --continue-at - --output "$part" "$base/$name"
+        printf '%s  %s\n' "$expected" "$part" | sha256sum --check
+        mv "$part" "$model_dir/$name"
+    }
+    fetch seedvr2_ema_3b_fp8_e4m3fn.safetensors 3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff
+    fetch ema_vae_fp16.safetensors 20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1
+    echo "SeedVR2 models ready at $model_dir"
 
 # Label durable state for container access on an SELinux host (Bazzite, CoreOS).
 #

@@ -120,3 +120,8 @@ runtime_requirements = ["onnxruntime-gpu==1.23.2"]
 name = "ComfyUI-VideoHelperSuite"
 repo = "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
 ref  = "main"
+
+[[nodes]]
+name = "ComfyUI-SeedVR2_VideoUpscaler"
+repo = "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler"
+ref  = "main"
