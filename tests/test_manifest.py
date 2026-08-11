@@ -300,3 +300,67 @@ def test_impact_detector_models_live_on_durable_state(model_path):
 def test_image_runs_as_a_non_root_user():
     body = (ROOT / "containers" / "Containerfile").read_text()
     assert re.search(r"^USER comfy$", body, re.M), "runtime stage must drop to comfy"
+
+
+def test_wan_rocm_smoke_workflow_is_core_only():
+    workflow = json.loads(
+        (ROOT / "workflows" / "wan2.2-ti2v-5b-rocm-smoke.json").read_text()
+    )
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    assert {node["properties"].get("cnr_id") for node in nodes.values()} <= {
+        None,
+        "comfy-core",
+    }
+    assert nodes[56]["type"] == "LoadImage" and nodes[56]["mode"] == 0
+    assert nodes[55]["type"] == "Wan22ImageToVideoLatent"
+    assert nodes[55]["widgets_values"][:3] == [768, 512, 49]
+    assert nodes[57]["type"] == "CreateVideo" and nodes[57]["widgets_values"] == [16]
+
+    models = {
+        model["name"]: model["directory"]
+        for node in nodes.values()
+        for model in node.get("properties", {}).get("models", [])
+    }
+    assert models == {
+        "wan2.2_ti2v_5B_fp16.safetensors": "diffusion_models",
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors": "text_encoders",
+        "wan2.2_vae.safetensors": "vae",
+    }
+
+
+def test_wan_14b_i2v_workflow_hands_off_between_core_models():
+    workflow = json.loads(
+        (ROOT / "workflows" / "wan2.2-i2v-14b-fp8-rocm-smoke.json").read_text()
+    )
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    assert {node["properties"].get("cnr_id") for node in nodes.values()} <= {
+        None,
+        "comfy-core",
+    }
+
+    assert nodes[50]["type"] == "WanImageToVideo"
+    assert nodes[50]["widgets_values"][:3] == [640, 640, 49]
+    assert nodes[52]["type"] == "LoadImage" and nodes[52]["mode"] == 0
+    assert nodes[61]["type"] == "CreateVideo" and nodes[61]["widgets_values"] == [16]
+
+    high_sampler = nodes[57]
+    low_sampler = nodes[58]
+    assert high_sampler["type"] == low_sampler["type"] == "KSamplerAdvanced"
+    assert high_sampler["widgets_values"][3:10] == [20, 3.5, "euler", "simple", 0, 10, "enable"]
+    assert low_sampler["widgets_values"][3:10] == [20, 3.5, "euler", "simple", 10, 10000, "disable"]
+
+    links = {link[0]: link for link in workflow["links"]}
+    assert links[113][1:5] == [57, 0, 58, 3]
+    assert links[124][1:5] == [58, 0, 8, 0]
+
+    models = {
+        model["name"]: model["directory"]
+        for node in nodes.values()
+        for model in node.get("properties", {}).get("models", [])
+    }
+    assert models == {
+        "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors": "diffusion_models",
+        "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors": "diffusion_models",
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors": "text_encoders",
+        "wan_2.1_vae.safetensors": "vae",
+    }
