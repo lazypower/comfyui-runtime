@@ -54,7 +54,9 @@ LABEL org.opencontainers.image.title="comfyui-${BACKEND}" \
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential ca-certificates git libgl1 libglib2.0-0 tini ${BACKEND_APT} \
+      build-essential ca-certificates git libdrm-common libgl1 libglib2.0-0 tini ${BACKEND_APT} \
+ && mkdir -p /opt/amdgpu/share/libdrm \
+ && ln -s /usr/share/libdrm/amdgpu.ids /opt/amdgpu/share/libdrm/amdgpu.ids \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /usr/local/bin/uv
@@ -114,6 +116,10 @@ COPY env/${BACKEND}/requirements.txt   /build/requirements.txt
 # recorded hashes into an enforced check. The `import torch` is the guard on
 # pruning -- if a pruned package turns out to be a DT_NEEDED of
 # libtorch_cuda.so, this build fails rather than the GPU host at 2am.
+#
+# Keep build-essential in the runtime image. Triton JIT-compiles a small native
+# launcher when some model kernels are first exercised; importing torch during
+# the build cannot cover that workflow-dependent runtime requirement.
 RUN python3 /build/scripts/pin.py fetch /opt/comfyui \
  && uv venv --python ${PYTHON_VERSION} /opt/comfyui/.venv \
  && uv pip sync \
@@ -124,7 +130,6 @@ RUN python3 /build/scripts/pin.py fetch /opt/comfyui \
  && python3 /build/scripts/pin.py prune ${BACKEND} /opt/comfyui/.venv \
  && /opt/comfyui/.venv/bin/python -c \
       "import torch; print('torch', torch.__version__, 'imports after prune')" \
- && apt-get purge -y --auto-remove build-essential \
  && find /opt/comfyui -maxdepth 3 -name .git -type d -prune -exec rm -rf {} + \
  && find /opt/comfyui -name '__pycache__' -type d -prune -exec rm -rf {} + \
  && rm -rf /build \
