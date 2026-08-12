@@ -33,8 +33,8 @@
   },
   "comfyui": {
     "repo": "https://github.com/comfyanonymous/ComfyUI",
-    "ref": "v0.27.1",
-    "commit": "c2638ce6c00e3426c48d56a775bc46e9a8464094"
+    "ref": "v0.32.0",
+    "commit": "c2bcbecd82ec5ae66594340b395c24ef0217b238"
   },
   "python_sources": [
     {
@@ -68,7 +68,7 @@
       "name": "ComfyUI-KJNodes",
       "repo": "https://github.com/kijai/ComfyUI-KJNodes",
       "ref": "main",
-      "commit": "195d312a251efdc484c3d9c4570914ab2da9da54"
+      "commit": "6ab7e8130e449ed2c0037589bcf84146ceb7fc9c"
     },
     {
       "name": "ComfyUI-Impact-Pack",
