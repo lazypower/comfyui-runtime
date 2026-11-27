@@ -190,8 +190,9 @@ ENV COMFY_BACKEND=${BACKEND} \
 USER comfy
 EXPOSE 8188
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8188/system_stats',timeout=4).status==200 else 1)"
+# No HEALTHCHECK. It is a Docker extension outside the OCI image spec, and
+# podman ignores it on OCI images, so the deployment declares the probe:
+# GET /system_stats on 8188, 30s interval, 5s timeout, 90s start period.
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint"]
 CMD ["--listen", "0.0.0.0", "--port", "8188"]
