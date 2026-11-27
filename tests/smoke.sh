@@ -174,8 +174,16 @@ sys.exit(0 if "SmokeProbeNode" in info else 1)' >/dev/null 2>&1
         ok "database initialises"
     fi
 
-    "$ENGINE" exec "$cid" test -f /var/mnt/diffusion/user/comfyui.db 2>/dev/null
-    check $? "database lives on durable state"
+    # v0.46.0 gated the database behind the assets system, which is off by
+    # default, so a database only exists when the entrypoint passes
+    # --enable-assets. The contract is where it lands, not that it exists.
+    if "$ENGINE" exec "$cid" test -f /var/mnt/diffusion/user/comfyui.db 2>/dev/null; then
+        ok "database lives on durable state"
+    elif "$ENGINE" exec "$cid" sh -c 'find / -xdev -name comfyui.db -not -path "/var/mnt/diffusion/*" 2>/dev/null | grep -q .'; then
+        bad "database escaped durable state"
+    else
+        ok "no database (assets disabled)"
+    fi
 
     "$ENGINE" rm -f "$cid" >/dev/null 2>&1
 else

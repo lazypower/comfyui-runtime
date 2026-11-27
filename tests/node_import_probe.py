@@ -59,9 +59,15 @@ folder_paths.set_temp_directory(os.path.join(os.path.abspath(args.temp_directory
 # VideoHelperSuite, KJNodes' LTXV nodes). main.py constructs it before loading
 # custom nodes.
 import server  # noqa: E402
+from app.assets.manager import default_asset_manager  # noqa: E402
+
+# v0.46.0 made asset_manager a required argument. Assets stay off here for the
+# same reason production leaves them off: AssetsEnabled starts a background
+# scanner, and this probe only needs PromptServer.instance to exist.
+args.disable_assets = True
 
 asyncio.set_event_loop(loop := asyncio.new_event_loop())
-server.PromptServer(loop)
+server.PromptServer(loop, default_asset_manager())
 
 # The real loader: builtin extras first, then custom_nodes. Same call main.py
 # makes at main.py:504.
