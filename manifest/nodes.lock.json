@@ -33,8 +33,8 @@
   },
   "comfyui": {
     "repo": "https://github.com/comfyanonymous/ComfyUI",
-    "ref": "v0.32.0",
-    "commit": "c2bcbecd82ec5ae66594340b395c24ef0217b238"
+    "ref": "v0.46.0",
+    "commit": "a277b5bf213e8a44fa34817b7770b54f86ef4cea"
   },
   "python_sources": [
     {
@@ -56,7 +56,7 @@
       "name": "rgthree-comfy",
       "repo": "https://github.com/rgthree/rgthree-comfy",
       "ref": "main",
-      "commit": "6b76ee6f2c5a007710b5a16f97c94330d6ecc871"
+      "commit": "bc48c6aaeca87bedbc14245d89f9bc6be37a630e"
     },
     {
       "name": "ComfyUI-Custom-Scripts",
@@ -68,19 +68,19 @@
       "name": "ComfyUI-KJNodes",
       "repo": "https://github.com/kijai/ComfyUI-KJNodes",
       "ref": "main",
-      "commit": "6ab7e8130e449ed2c0037589bcf84146ceb7fc9c"
+      "commit": "1762f9af14bb97e9e6441ac5d030c47553d446d3"
     },
     {
       "name": "ComfyUI-Impact-Pack",
       "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Pack",
       "ref": "Main",
-      "commit": "429d0159ad429e64d2b3916e6e7be9c22d025c3c"
+      "commit": "aba2c684bfe69cce4e17158b68841e1f794ebe6a"
     },
     {
       "name": "ComfyUI-Impact-Subpack",
       "repo": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
       "ref": "main",
-      "commit": "50c7b71a6a224734cc9b21963c6d1926816a97f1"
+      "commit": "b4bf952cde06df01eb3deff27d6dc6a9fc9d464a"
     },
     {
       "name": "ComfyUI_IPAdapter_plus",
@@ -101,13 +101,13 @@
       "name": "ComfyUI-VideoHelperSuite",
       "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
       "ref": "main",
-      "commit": "4ee72c065db22c9d96c2427954dc69e7b908444b"
+      "commit": "775ae691ecbab6a6d09a2c186f95d130cf8a10d3"
     },
     {
       "name": "ComfyUI-SeedVR2_VideoUpscaler",
       "repo": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler",
       "ref": "main",
-      "commit": "4490bd1f482e026674543386bb2a4d176da245b9"
+      "commit": "f7362118d67db1045f4374428a0f5c814c7d0b7a"
     }
   ]
 }
