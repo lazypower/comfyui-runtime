@@ -16,7 +16,7 @@ base     = "docker.io/library/ubuntu:24.04"   # neutral base; backend runtime ar
 
 [comfyui]
 repo = "https://github.com/comfyanonymous/ComfyUI"
-ref  = "v0.32.0"
+ref  = "v0.46.0"
 
 # Git requirements cannot carry artifact hashes, so every upstream VCS Python
 # dependency must be declared here. The lock resolves its commit and the
