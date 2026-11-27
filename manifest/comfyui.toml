@@ -125,3 +125,15 @@ ref  = "main"
 name = "ComfyUI-SeedVR2_VideoUpscaler"
 repo = "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler"
 ref  = "main"
+
+# Loads GGUF-quantized diffusion models, which is the only way this hardware
+# runs the larger architectures: a 20B Qwen-Image or a 12B Flux dev will not
+# fit a 10GB card unquantized, and offloading to host RAM costs minutes per
+# render. Q4/Q5 Flux dev lands at 6-8GB and stays resident.
+#
+# Replaces ComfyUI_bitsandbytes_NF4, which upstream deprecated in Sept 2026
+# with the README "This is terrible and outdated, do not use this."
+[[nodes]]
+name = "ComfyUI-GGUF"
+repo = "https://github.com/city96/ComfyUI-GGUF"
+ref  = "main"
