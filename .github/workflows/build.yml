@@ -73,15 +73,31 @@ jobs:
           print(f"python={lock['runtime']['python']}")
           PY
 
+      # Docker media types, no attestation index. Podman reads HEALTHCHECK only
+      # from a Docker-format image config; from an OCI image it silently runs
+      # the container with no healthcheck at all.
       - name: Build
         run: |
           docker build \
+            --provenance=false \
+            --output type=image,oci-mediatypes=false \
             --file containers/Containerfile \
             --build-arg BACKEND=${{ matrix.backend }} \
             --build-arg BACKEND_APT="${{ steps.args.outputs.apt }}" \
             --build-arg PYTHON_VERSION="${{ steps.args.outputs.python }}" \
             --tag comfyui:ci-${{ matrix.backend }} \
             .
+
+      - name: Image is Docker format
+        run: |
+          media="$(curl -sf --unix-socket /var/run/docker.sock \
+            http://localhost/images/comfyui:ci-${{ matrix.backend }}/json \
+            | python3 -c 'import json,sys; print((json.load(sys.stdin).get("Descriptor") or {}).get("mediaType", ""))')"
+          echo "manifest media type: ${media:-<none reported>}"
+          case "$media" in
+            application/vnd.docker.distribution.manifest.v2+json) ;;
+            *) echo "::error::expected a Docker v2 manifest; podman drops HEALTHCHECK from OCI images"; exit 1 ;;
+          esac
 
       - name: Disk after build
         if: always()
